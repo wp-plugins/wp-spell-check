@@ -1,4 +1,7 @@
 ﻿=== WP Spell Check ===
+Requires at least: 4.1.1
+Tested up to: 4.2.2
+Stable tag: 1.1
 
 Works in the background: yes
 Pro version scans the entire website: yes
@@ -19,25 +22,9 @@ Scans Page slugs: Yes WP Spell Check Pro
 Scans Post Slugs: Yes WP Spell Check Pro
 Scans Post categories: Yes WP Spell Check Pro
 
-Copyright: © 2015 Persyo Inc
-Contributors: wpspellcheck
-Donate Link: www.wpspellcheck.com
-Tags: spelling, SEO, Spell Check, WordPress spell check, Spell Checker, WordPress spell checker, spelling errors, spelling mistakes, spelling report, fix spelling, WP Spell Check
-
-Author: Persyo Inc.
-Author URI: https://www.wpspellcheck.com
-Plugin Name: WP Spell Check
-
 Privacy URI: https://www.wpspellcheck.com/privacy-policy/
 Pro Add-on / Home Page: https://www.wpspellcheck.com/
 Pro Add-on / Prices: https://www.wpspellcheck.com/purchase-options/
-
-Requires at least: 4.1.1
-Tested up to: 4.2.2
-Stable tag: 1.0
-
-License: GPLv2 or later
-License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
 A powerful plug-in designed to report spelling errors throughout your WordPress website
 
