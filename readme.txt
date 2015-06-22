@@ -1,7 +1,7 @@
 ﻿=== WP Spell Check ===
 Requires at least: 4.1.1
 Tested up to: 4.2.2
-Stable tag: 1.1
+Stable tag: 1.2
 
 Works in the background: yes
 Pro version scans the entire website: yes
