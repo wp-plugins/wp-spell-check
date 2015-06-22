@@ -1,4 +1,4 @@
-﻿=== WP Spell Check ===
+﻿﻿=== WP Spell Check ===
 
 Works in the background: yes
 Pro version scans the entire website: yes
@@ -38,7 +38,7 @@ Stable tag: 1.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
-A powerful plug-in designed to report spelling errors throughout your WordPress website
+A powerful plug-in designed to scan and report spelling errors throughout your WordPress website
 == License ==
 
 Copyright: © 2015 [Persyo, Inc.](http://www.persyo.com/) (coded in CANADA)
