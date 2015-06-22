@@ -1,4 +1,4 @@
-﻿﻿=== WP Spell Check ===
+﻿=== WP Spell Check ===
 
 Works in the background: yes
 Pro version scans the entire website: yes
