@@ -38,6 +38,17 @@
 		$language_setting = $wpdb->get_results('SELECT option_value from ' . $table_name . ' WHERE option_name="language_setting";');
 		$word_ignore = $wpdb->get_results('SELECT keyword FROM ' . $ignore_table . ' WHERE type="word";');
 		$pspell_link = pspell_new($language_setting[0]->option_value);
+		if ($pspell_link == false) {
+			$pspell_config = pspell_config_create('en');
+			if ($language_setting[0]->option_value == 'en_CA') {
+				pspell_config_personal($pspell_config, dirname(__FILE__) . "/dict/en_CA.pws");
+			} elseif ($language_setting[0]->option_value == 'en_US') {
+				pspell_config_personal($pspell_config, dirname(__FILE__) . "/dict/en_US.pws");
+			} elseif ($language_setting[0]->option_value == 'en_US') {
+				pspell_config_personal($pspell_config, dirname(__FILE__) . "/dict/en_UK.pws");
+			}
+			$pspell_link = pspell_new_config($pspell_config);
+		}
 		
 		if (preg_match('#\bhttps?://[^\s()<>]+(?:\([\w\d]+\)|([^[:punct:]\s]|/))#', $word)) { return true; }
 		if (is_numeric($word)) { return true; }
