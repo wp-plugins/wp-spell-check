@@ -176,3 +176,42 @@ function GetURLParameter(sParam)
         }
     }
 }
+
+//Used for the popup message on the results page
+jQuery(document).ready(function() {
+var mouseover_visible = false;
+jQuery('.wpsc-mouseover-button-post').mouseenter(function() {
+jQuery('.wpsc-mouseover-text-post').animate({opacity: 1.0}, 400, function() { mouseover_visible = true; });
+}).mouseleave(function() {
+jQuery('.wpsc-mouseover-text-post').animate({opacity: 0}, 400);
+mouseover_visible = false;
+});
+jQuery('.wpsc-mouseover-button-post').click(function() {
+if (!mouseover_visible) {
+jQuery('.wpsc-mouseover-text-post').stop();
+jQuery('.wpsc-mouseover-text-post').animate({opacity: 1.0}, 400, function() { mouseover_visible = true; });
+} else {
+jQuery('.wpsc-mouseover-text-post').animate({opacity: 0}, 400);
+mouseover_visible = false;
+}
+});
+});
+
+jQuery(document).ready(function() {
+var mouseover_visible = false;
+jQuery('.wpsc-mouseover-button-page').mouseenter(function() {
+jQuery('.wpsc-mouseover-text-page').animate({opacity: 1.0}, 400, function() { mouseover_visible = true; });
+}).mouseleave(function() {
+jQuery('.wpsc-mouseover-text-page').animate({opacity: 0}, 400);
+mouseover_visible = false;
+});
+jQuery('.wpsc-mouseover-button-page').click(function() {
+if (!mouseover_visible) {
+jQuery('.wpsc-mouseover-text-page').stop();
+jQuery('.wpsc-mouseover-text-page').animate({opacity: 1.0}, 400, function() { mouseover_visible = true; });
+} else {
+jQuery('.wpsc-mouseover-text-page').animate({opacity: 0}, 400);
+mouseover_visible = false;
+}
+});
+});

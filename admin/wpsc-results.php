@@ -50,6 +50,17 @@ class sc_table extends WP_List_Table {
 		$language_setting = $wpdb->get_results('SELECT option_value from ' . $table_name . ' WHERE option_name="language_setting";');
 		$dict_words = $wpdb->get_results('SELECT word FROM ' . $dict_table . ';');
 		$pspell_link = pspell_new($language_setting[0]->option_value);
+		if ($spell_link == false) {
+			$pspell_config = pspell_config_create('en');
+			if ($language_setting[0]->option_value == 'en_CA') {
+				pspell_config_personal($pspell_config, dirname(__FILE__) . "/dict/en_CA.pws");
+			} elseif ($language_setting[0]->option_value == 'en_US') {
+				pspell_config_personal($pspell_config, dirname(__FILE__) . "/dict/en_US.pws");
+			} elseif ($language_setting[0]->option_value == 'en_US') {
+				pspell_config_personal($pspell_config, dirname(__FILE__) . "/dict/en_UK.pws");
+			}
+			$pspell_link = pspell_new_config($pspell_config);
+		}
 		$sorting = '';
 		if ($_GET['orderby'] != '') $sorting .= '&orderby=' . $_GET['orderby'];
 		if ($_GET['order'] != '') $sorting .= '&order=' . $_GET['order'];
@@ -289,7 +300,7 @@ function update_word_admin($old_word, $new_word, $page_name, $page_type) {
 	$new_word = stripslashes($new_word);
 
 
-	if ($page_type == 'Post Content' || $page_type == 'Page Content') {
+	if ($page_type == 'Post Content' || $page_type == 'Page Content' || $page_type == 'Media Description') {
 		//****PAGE AND POST CONTENT****
 		$page_result = $wpdb->get_results('SELECT post_content, post_title FROM ' . $table_name . ' WHERE ID="' . $page_name . '"');
 
@@ -298,7 +309,7 @@ function update_word_admin($old_word, $new_word, $page_name, $page_type) {
 		$old_name = $page_result[0]->post_title;
 		$wpdb->update($table_name, array('post_content' => $updated_content), array('ID' => $page_name));
 		$wpdb->delete($words_table, array('word' => $old_word, 'page_name' => $old_name)); //Delete all occurrences of the word from existing list of errors for this page
-	} elseif ($page_type == 'Menu Item' || $page_type == 'Post Title' || $page_type == 'Page Title') {
+	} elseif ($page_type == 'Menu Item' || $page_type == 'Post Title' || $page_type == 'Page Title' || $page_type == 'Slider Title' || $page_type == 'Media Title') {
 		//****MENU ITEMS AND PAGE/POST TITLES****
 		$menu_result = $wpdb->get_results('SELECT post_title FROM ' . $table_name . ' WHERE ID="' . $page_name . '"');
 		$updated_content = str_replace($old_word, $new_word, $menu_result[0]->post_title);
@@ -307,6 +318,63 @@ function update_word_admin($old_word, $new_word, $page_name, $page_type) {
 		$wpdb->update($table_name, array('post_title' => $updated_content), array('ID' => $page_name));
 		$wpdb->update($words_table, array('page_name' => $updated_content), array('page_name' => $old_name)); //Update the title of the page/post/menu in the spellcheck database
 		$wpdb->delete($words_table, array('word' => $old_word, 'page_name' => $updated_content)); //Delete all occurrences of the word from existing list of errors
+	} elseif ($page_type == 'Slider Caption') {
+		//****SLIDER CAPTIONS****
+		$menu_result = $wpdb->get_results('SELECT ID, post_title FROM ' . $table_name . ' WHERE ID="' . $page_name . '"');
+		$caption = get_post_meta($menu_result[0]->ID, 'my_slider_caption', true);
+		$updated_content = str_replace($old_word, $new_word, $caption);
+
+		update_post_meta($menu_result[0]->ID, 'my_slider_caption', $updated_content);
+		$wpdb->delete($words_table, array('word' => $old_word, 'page_name' => $menu_result[0]->post_title)); //Delete all occurrences of the word from existing list of errors
+	} elseif ($page_type == 'Huge IT Slider Caption') {
+		//****SLIDER CAPTIONS****
+		$it_table = $wpdb->prefix . 'wp_huge_itslider_images';
+		$menu_result = $wpdb->get_results('SELECT sl_sdesc FROM ' . $it_table . ' WHERE sl_stitle="' . $page_name . '"');
+		$updated_content = str_replace($old_word, $new_word, $menu_result[0]->sl_stitle);
+
+		$wpdb->update($it_table, array('sl_sdesc' => $updated_content), array('sl_stitle' => $page_name));
+		$wpdb->delete($words_table, array('word' => $old_word, 'page_name' => $menu_result[0]->post_title)); //Delete all occurrences of the word from existing list of errors
+	} elseif ($page_type == 'Huge IT Slider Title') {
+		//****SLIDER CAPTIONS****
+		$it_table = $wpdb->prefix . 'wp_huge_itslider_images';
+		$menu_result = $wpdb->get_results('SELECT sl_stitle FROM ' . $it_table . ' WHERE sl_stitle="' . $page_name . '"');
+		$updated_content = str_replace($old_word, $new_word, $menu_result[0]->sl_stitle);
+
+		$wpdb->update($it_table, array('sl_stitle' => $updated_content), array('sl_stitle' => $page_name));
+		$wpdb->delete($words_table, array('word' => $old_word, 'page_name' => $menu_result[0]->post_title)); //Delete all occurrences of the word from existing list of errors
+	} elseif ($page_type == 'Smart Slider Caption') {
+		//****SLIDER CAPTIONS****
+		$slider_table = $wpdb->prefix . 'wp_nextend_smartslider_slides';
+		$menu_result = $wpdb->get_results('SELECT description FROM ' . $slider_table . ' WHERE title="' . $page_name . '"');
+		$updated_content = str_replace($old_word, $new_word, $menu_result[0]->description);
+
+		$wpdb->update($slider_table, array('description' => $updated_content), array('title' => $page_name));
+		$wpdb->delete($words_table, array('word' => $old_word, 'page_name' => $menu_result[0]->post_title)); //Delete all occurrences of the word from existing list of errors
+	} elseif ($page_type == 'Smart Slider Title') {
+		//****SLIDER CAPTIONS****
+		$slider_table = $wpdb->prefix . 'wp_nextend_smartslider_slides';
+		$menu_result = $wpdb->get_results('SELECT title FROM ' . $slider_table . ' WHERE title="' . $page_name . '"');
+		$updated_content = str_replace($old_word, $new_word, $menu_result[0]->title);
+
+		$wpdb->update($slider_table, array('title' => $updated_content), array('title' => $page_name));
+		$wpdb->delete($words_table, array('word' => $old_word, 'page_name' => $menu_result[0]->post_title)); //Delete all occurrences of the word from existing list of errors
+	} elseif ($page_type == 'Media Alternate Text') {
+		//****SLIDER CAPTIONS****
+		$menu_result = $wpdb->get_results('SELECT ID, post_title FROM ' . $table_name . ' WHERE ID="' . $page_name . '"');
+		$caption = get_post_meta($menu_result[0]->ID, '_wp_attachment_image_alt', true);
+		$updated_content = str_replace($old_word, $new_word, $caption);
+
+		update_post_meta($menu_result[0]->ID, '_wp_attachment_image_alt', $updated_content);
+		$wpdb->delete($words_table, array('word' => $old_word, 'page_name' => $menu_result[0]->post_title)); //Delete all occurrences of the word from existing list of errors
+	} elseif ($page_type == 'Media Caption') {
+		//****MEDIA CAPTIONS****
+		$page_result = $wpdb->get_results('SELECT post_excerpt, post_title FROM ' . $table_name . ' WHERE ID="' . $page_name . '"');
+
+		$updated_content = str_replace($old_word, $new_word, $page_result[0]->post_excerpt);
+
+		$old_name = $page_result[0]->post_title;
+		$wpdb->update($table_name, array('post_excerpt' => $updated_content), array('ID' => $page_name));
+		$wpdb->delete($words_table, array('word' => $old_word, 'page_name' => $old_name)); //Delete all occurrences of the word from existing list of errors for this page
 	} elseif ($page_type == 'Post Tag' || $page_type == 'Post Category') {
 		//****POST TAGS AND CATEGORIES****
 		$tag_result = $wpdb->get_results('SELECT name FROM ' . $terms_table . ' WHERE name LIKE "%' . $old_word . '%"');
@@ -410,11 +478,13 @@ function admin_render() {
 	$add = $_GET['add'];
 	$total_pages = sizeof(get_pages(array('number' => PHP_INT_MAX, 'hierarchical' => 0, 'post_type' => 'page', 'post_status' => array('publish', 'draft'))));
 	$total_posts = sizeof(get_posts(array('posts_per_page' => PHP_INT_MAX, 'post_type' => 'post', 'post_status' => array('publish', 'draft'))));
+	$total_media = sizeof(get_posts(array('posts_per_page' => PHP_INT_MAX, 'post_type' => 'attachment', 'post_status' => array('publish', 'draft'))));
 	if (!$ent_included) {
 		if ($total_pages > 500) $total_pages = 500;
 		if ($total_posts > 500) $total_posts = 500;
+		if ($total_media > 500) $total_posts = 500;
 	}
-	$estimated_time = intval(($total_pages + $total_posts) / 2.4);
+	$estimated_time = intval(($total_pages + $total_posts + $total_media) / 2.4);
 	$scan_message = '';
 	if ($_GET['action'] == 'check' && $_GET['submit'] == 'Pages') {
 		$scan_message = 'Scan has been started for page content. Estimated time for completion is '.$estimated_time.' Seconds. <a href="/wp-admin/admin.php?page=wp-spellcheck.php">Click here</a> to see scan results.';
@@ -526,6 +596,26 @@ function admin_render() {
 		}
 		$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress'));
 	}
+	if ($_GET['action'] == 'check' && $_GET['submit'] == 'Sliders') {
+		$scan_message = 'Scan has been started for sliders. Estimated time for completion is '.$estimated_time.' Seconds. <a href="/wp-admin/admin.php?page=wp-spellcheck.php">Click here</a> to see scan results.';
+		clear_results();
+		if ($ent_included) { 
+		wp_schedule_single_event(time(), 'adminchecksliders_ent');
+		} else {
+		wp_schedule_single_event(time(), 'adminchecksliders_pro');
+		}
+		$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress'));
+	}
+	if ($_GET['action'] == 'check' && $_GET['submit'] == 'Media Files') {
+		$scan_message = 'Scan has been started for media files. Estimated time for completion is '.$estimated_time.' Seconds. <a href="/wp-admin/admin.php?page=wp-spellcheck.php">Click here</a> to see scan results.';
+		clear_results();
+		if ($ent_included) { 
+		wp_schedule_single_event(time(), 'admincheckmedia_ent');
+		} else {
+		wp_schedule_single_event(time(), 'admincheckmedia_pro');
+		}
+		$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress'));
+	}
 	if ($_GET['action'] == 'check' && $_GET['submit'] == 'Entire Site') {
 		$scan_message = 'Scan has been started for the entire site. Estimated time for completion is '.$estimated_time.' Seconds. <a href="/wp-admin/admin.php?page=wp-spellcheck.php">Click here</a> to see scan results.';
 		clear_results();
@@ -577,35 +667,48 @@ function admin_render() {
 	$post_types = get_post_types();
 	$post_type_list = array();
 	foreach ($post_types as $type) {
-		if ($type != 'revision' && $type != 'page' && $type != 'optionsframework')
+		if ($type != 'revision' && $type != 'page' && $type != 'optionsframework' && $type != 'attachment' && $type != 'leadpages_post' && $type != 'slider')
 			array_push($post_type_list, $type);
 	}
 
 	$page_count = get_pages(array('number' => PHP_INT_MAX, 'hierarchical' => 0, 'post_type' => 'page', 'post_status' => array('publish', 'draft')));
 	$post_count = get_posts(array('posts_per_page' => PHP_INT_MAX, 'post_type' => $post_type_list, 'post_status' => array('publish', 'draft')));
+	$media_count = get_posts(array('posts_per_page' => PHP_INT_MAX, 'post_type' => 'attachment'));
 	$page_scan = $wpdb->Get_results("SELECT option_value FROM $options_table WHERE option_name='page_count';");
 	$post_scan = $wpdb->Get_results("SELECT option_value FROM $options_table WHERE option_name='post_count';");
+	$media_scan = $wpdb->Get_results("SELECT option_value FROM $options_table WHERE option_name='media_count';");
+	foreach ($post_count as $post_debug) {
+		//echo $post_debug->post_type . "<br />";
+	}
 	?>
 		<?php show_feature_window(); ?>
+		<?php check_install_notice(); ?>
 		<div class="wrap">
-			<h2><img src="<?php echo plugin_dir_url( __FILE__ ) . '../images/logo.png'; ?>" alt="WP Spell Check" /> <span style="position: relative; top: -15px;">Scan Reults</span></h2>
+			<h2><img src="<?php echo plugin_dir_url( __FILE__ ) . '../images/logo.png'; ?>" alt="WP Spell Check" /> <span style="position: relative; top: -15px;">Scan Results</span></h2>
 			<?php $bulk_message = $_GET['bulk_message']; ?>
 			<form action="<?php echo admin_url('admin.php'); ?>" method='GET'>
 				<input type="hidden" name="page" value="wp-spellcheck.php">
 				<input type="hidden" name="action" value="check">
-				<style> p.submit { display: inline-block; margin-left: 10px; } h3.sc-message { width: 49%; display: inline-block; } </style>
+				<style> p.submit { display: inline-block; margin-left: 10px; } h3.sc-message { width: 49%; display: inline-block; } .wpsc-mouseover-text-page,.wpsc-mouseover-text-post { color: black; font-size: 12px; width: 225px; display: inline-block; position: absolute; margin: -13px 0 0 20px; padding: 3px; border: 1px solid black; border-radius: 10px; opacity: 0; background: white; } </style>
 				<?php echo "<h3 class='sc-message'style='color: rgb(0, 150, 255); font-size: 1.4em;'>Website Literacy Factor: " . $literacy_factor . "%"; ?>
 				<?php echo "<h3 class='sc-message' style='color: rgb(0, 115, 0);'>The last scan found {$word_count} errors".$pro_message."</h3>"; ?>
-				<?php echo "<h3 class='sc-message' style='color: rgb(0, 115, 0);'>" . $page_scan[0]->option_value . " pages scanned out of " . sizeof($page_count) . "</h3>"; ?>
-				<?php echo "<h3 class='sc-message' style='color: rgb(0, 115, 0);'>" . $post_scan[0]->option_value . " posts scanned out of " . sizeof($post_count) . "</h3>"; ?>
+				<?php echo "<h3 class='sc-message' style='color: rgb(0, 115, 0);'>" . $page_scan[0]->option_value . " pages scanned out of " . sizeof($page_count);
+					if ($pro_included && sizeof($page_count) >= 500) { echo "<span class='wpsc-mouseover-button-page' style='border-radius: 29px; border: 1px solid green; display: inline-block; margin-left: 10px; padding: 4px 10px; cursor: help;'>?<span class='wpsc-mouseover-text-page'>Our pro version scans up to 500 pages.<br /><a href='https://www.wpspellcheck.com/purchase-options' target='_blank'>Click here</a> to upgrade to enterprise</span></span>";
+					} elseif (!$pro_included && !$ent_included && sizeof($page_count) >= 100) { echo "<span class='wpsc-mouseover-button-page' style='border-radius: 29px; border: 1px solid green; display: inline-block; margin-left: 10px; padding: 4px 10px; cursor: help;'>?<span class='wpsc-mouseover-text-page'>Our free version scans up to 100 pages.<br /><a href='https://www.wpspellcheck.com/purchase-options' target='_blank'>Click here</a> to upgrade to pro</span></span>"; }
+					echo "</h3>"; ?>
+				<?php echo "<h3 class='sc-message' style='color: rgb(0, 115, 0);'>" . $post_scan[0]->option_value . " posts scanned out of " . sizeof($post_count);
+				if ($pro_included && sizeof($post_count) >= 500) { echo "<span class='wpsc-mouseover-button-post' style='border-radius: 29px; border: 1px solid green; display: inline-block; margin-left: 10px; padding: 4px 10px; cursor: help;'>?<span class='wpsc-mouseover-text-post'>Our pro version scans up to 500 posts.<br /><a href='https://www.wpspellcheck.com/purchase-options' target='_blank'>Click here</a> to upgrade to enterprise</span></span>";
+				} elseif (!$pro_included && !$ent_included && sizeof($post_count) >= 100) { echo "<span class='wpsc-mouseover-button-post' style='border-radius: 29px; border: 1px solid green; display: inline-block; margin-left: 10px; padding: 4px 10px; cursor: help;'>?<span class='wpsc-mouseover-text-post'>Our free version scans up to 100 posts.<br /><a href='https://www.wpspellcheck.com/purchase-options' target='_blank'>Click here</a> to upgrade to pro</span></span>"; }
+				echo "</h3>"; ?>
+				<?php if ($pro_included || $ent_included) { echo "<h3 class='sc-message' style='color: rgb(0, 115, 0);'>" . $media_scan[0]->option_value . " media files scanned out of " . sizeof($media_count) . "</h3>"; } ?>
 				<?php echo "<h3 class='sc-message' style='color: rgb(0, 115, 0);'>$total_words words were scanned on your entire website</h3>"; ?>
 				<?php echo "<h3 class='sc-message' style='color: rgb(0, 115, 0);'>The last scan took $time_of_scan</h3>"; ?>
 				<?php echo "<h3 class='sc-message' style='color: rgb(0, 115, 0);'>$scan_message</h3><br />"; ?>
-				<?php if (!$pro_included && !$ent_included) echo "<h3 class='sc-message' style='color: rgb(0, 115, 0);'>$pro_words errors have been found on other parts of your website. <a href='https://www.wpspellcheck.com/purchase-options' target='_blank'>Click here</a> to update to pro version to fix them.</h3><br />"; ?>
+				<?php if (!$pro_included && !$ent_included) echo "<h3 class='sc-message' style='color: rgb(225, 0, 0);'>$pro_words errors have been found on other parts of your website. <a href='https://www.wpspellcheck.com/purchase-options' target='_blank'>Click here</a> to update to pro version to fix them.</h3><br />"; ?>
 			<?php if($bulk_message != '') echo "<div class='wpsc-message' style='font-size: 1.3em; color: rgb(0, 115, 0); font-weight: bold;'>" . $bulk_message . "</div>"; ?>
 			<?php if($message != '') echo "<div class='wpsc-message' style='font-size: 1.3em; color: rgb(0, 115, 0); font-weight: bold;'>" . $message . "</div>"; ?>
 				<h3 style="display: inline-block;">Scan:</h3>
-				<?php submit_button( 'Entire Site' ); submit_button( 'Pages' ); submit_button( 'Posts' ); if ($pro_included || $ent_included) { submit_button( 'Menus'); submit_button( 'Page Titles' ); submit_button( 'Post Titles' ); submit_button( 'Tags' ); submit_button( 'Categories' ); submit_button( 'SEO Descriptions' ); submit_button( 'SEO Titles' ); submit_button( 'Page Slugs' ); submit_button( 'Post Slugs' ); } submit_button( 'Clear Results' ); ?> <p class="submit"><input type="submit" name="submit" id="submit" class="button button-primary" style="background-color: red;" value="See Scan Results"></p>
+				<?php submit_button( 'Entire Site' ); submit_button( 'Pages' ); submit_button( 'Posts' ); if ($pro_included || $ent_included) { submit_button( 'Menus'); submit_button( 'Page Titles' ); submit_button( 'Post Titles' ); submit_button( 'Tags' ); submit_button( 'Categories' ); submit_button( 'SEO Descriptions' ); submit_button( 'SEO Titles' ); submit_button( 'Page Slugs' ); submit_button( 'Post Slugs' ); submit_button( 'Sliders' ); submit_button( 'Media Files' ); } submit_button( 'Clear Results' ); ?> <p class="submit"><input type="submit" name="submit" id="submit" class="button button-primary" style="background-color: red;" value="See Scan Results"></p>
 			</form>
 			<form id="words-list" method="get" style="width: 75%; float: left;">
 				<input type="hidden" name="page" value="<?php echo $_REQUEST['page'] ?>" />
@@ -621,6 +724,52 @@ function admin_render() {
   fjs.parentNode.insertBefore(js, fjs);
 }(document, 'script', 'facebook-jssdk'));</script>
 				<a href="https://www.wpspellcheck.com/" target="_blank"><img src="<?php echo plugin_dir_url( __FILE__ ) . '../images/logo.png'; ?>" alt="WP Spell Check" /></a>
+<script type="text/javascript">
+//<![CDATA[
+if (typeof newsletter_check !== "function") {
+window.newsletter_check = function (f) {
+    var re = /^([a-zA-Z0-9_\.\-\+])+\@(([a-zA-Z0-9\-]{1,})+\.)+([a-zA-Z0-9]{2,})+$/;
+    if (!re.test(f.elements["ne"].value)) {
+        alert("The email is not correct");
+        return false;
+    }
+    for (var i=1; i<20; i++) {
+    if (f.elements["np" + i] && f.elements["np" + i].value == "") {
+        alert("");
+        return false;
+    }
+    }
+    if (f.elements["ny"] && !f.elements["ny"].checked) {
+        alert("You must accept the privacy statement");
+        return false;
+    }
+    return true;
+}
+}
+//]]>
+</script>
+
+<div class="newsletter newsletter-subscription">
+<h2>Stay up to date with news and software updates</h2>
+<form method="post" action="https://www.wpspellcheck.com/wp-content/plugins/newsletter/do/subscribe.php" onsubmit="return newsletter_check(this)">
+
+<table cellspacing="0" cellpadding="3" border="0">
+
+<!-- email -->
+<tr>
+	<th>Email</th>
+	<td align="left"><input class="newsletter-email" type="email" name="ne" size="30" required></td>
+</tr>
+
+<tr>
+	<td colspan="2" class="newsletter-td-submit">
+		<input class="newsletter-submit" type="submit" value="Sign me up"/>
+	</td>
+</tr>
+
+</table>
+</form>
+</div>
 				<h2>Follow us on Facebook</h2>
 				<div class="fb-like-box" data-href="https://www.facebook.com/pages/WP-Spell-Check/981317565238438" data-colorscheme="light" data-show-faces="false" data-header="true" data-stream="false" data-show-border="true"></div>
 				<div class="wpsc-sidebar" style="margin-bottom: 15px;"><h2>Like the Plugin? Leave us a review</h2><center><a class="review-button" href="https://www.facebook.com/pages/WP-Spell-Check/981317565238438" target="_blank">Leave a Quick Review</a></center><small>Reviews help constantly improve the plugin &amp; keep us motivated! <strong>Thank you for your support!</strong></small></div>

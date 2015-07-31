@@ -5,3 +5,7 @@
 .request-feature-popup button { padding: 5px 30px; background-color: #0096ff; color: white; border-radius: 5px; }
 .request-feature { border-right: 2px darkgray solid; border-left: 2px darkgray solid; text-align: center;  }
 .request-feature a { margin: 0 16px; font-size: 1.4em; line-height: 1.4em; }
+.wpsc-install-notice { position: fixed; left: 50%; top: 50%; width: 500px; margin: -120px 0 0 -260px; border-radius: 10px; background: white; box-shadow: black 1px 1px 1px; text-align: center; height: 220px; padding: 10px; z-index: 99999; }
+.wpsc-install-content { display: inline-block; width: 49%; vertical-align: top; }
+.wpsc-install-notice img { display: block; margin: auto; }
+.wpsc-install-dismiss { float: right; text-align: right; }

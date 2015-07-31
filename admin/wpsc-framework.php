@@ -44,7 +44,7 @@
 				pspell_config_personal($pspell_config, dirname(__FILE__) . "/dict/en_CA.pws");
 			} elseif ($language_setting[0]->option_value == 'en_US') {
 				pspell_config_personal($pspell_config, dirname(__FILE__) . "/dict/en_US.pws");
-			} elseif ($language_setting[0]->option_value == 'en_US') {
+			} elseif ($language_setting[0]->option_value == 'en_UK') {
 				pspell_config_personal($pspell_config, dirname(__FILE__) . "/dict/en_UK.pws");
 			}
 			$pspell_link = pspell_new_config($pspell_config);
@@ -77,9 +77,13 @@
 		$ignore_table = $wpdb->prefix . 'spellcheck_ignore';
 		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
 		set_time_limit(600); // Set PHP timeout limit in case of large website
+		global $pro_included;
+		$total_pages = 100;
+		if ($pro_included) $total_pages = 500;
 		$total_words = 0;
 		$page_count = 0;
-		$page_list = get_pages(array('number' => 100, 'hierarchical' => 0, 'post_type' => 'page', 'post_status' => array('publish', 'draft')));
+		$word_count = 0;
+		$page_list = get_pages(array('number' => PHP_INT_MAX, 'hierarchical' => 0, 'post_type' => 'page', 'post_status' => array('publish', 'draft')));
 		if (!$is_running) {
 			$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress')); // Flag that a scan is in progress
 			$start_time = time();
@@ -104,11 +108,13 @@
 			$words_content = preg_replace("/(\<.*?\>)/",' ',$words_content);
 			$words_content = html_entity_decode(strip_tags($words_content), ENT_QUOTES, 'utf-8');
 			if ($options_list[23]->option_value == 'true') {
-				$words_content = preg_replace('/\S+\@\S+\.\S+/', '', $words_content);
+				$words_content = preg_replace('/\S+\@\S+\.\S+/', ' ', $words_content);
 			}
 			if ($options_list[24]->option_value == 'true') {
-				$words_content = preg_replace('/http|https|ftp\S+/', '', $words_content);
-				$words_content = preg_replace('/www\.\S+/', '', $words_content);
+				//$words_content = preg_replace('/http|https|ftp\S+/', '', $words_content);
+				$words_content = preg_replace('/(https?|ftp):\/\/w{0,3}.[^ <]+/', ' ', $words_content);
+				$words_content = preg_replace('/w{3}.[^ <]+/', ' ', $words_content);
+				$words_content = preg_replace('/[a-z1-3]+.(com|ca)([^a-z1-3]|$)/', ' ', $words_content);
 			}
 			$words_content = preg_replace("/[0-9]/", " ", $words_content);
 			$words_content = preg_replace("/[^a-zA-z'’`]/", " ", $words_content);
@@ -155,16 +161,24 @@
 					if (sizeof($dict_check) < 1) {
 						//Check if word already exists in the database for that page
 						if ((strtoupper($word) != $word || $caps_check[0]->option_value == 'false') && $word != '' && !is_numeric($word)) {
+							if ($page_count <= $total_pages) {
 							$word = addslashes($word);
 							$wpdb->insert($table_name, array('word' => $word, 'page_name' => $page->post_title, 'page_type' => 'Page Content'));
+							} else {
+								$word_count++;
+							}
 						}
 					}
 				}
 			}	
 		}
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='pro_word_count';");
+		$word_count = $word_count + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $word_count), array('option_name' => 'pro_word_count'));
 		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='total_word_count';");
 		$total_words = $total_words + intval($counter[0]->option_value);
 		$wpdb->update($options_table, array('option_value' => $total_words), array('option_name' => 'total_word_count'));
+		if ($page_count > $total_pages) $page_count = $total_pages;
 		$wpdb->update($options_table, array('option_value' => $page_count), array('option_name' => 'page_count'));
 		if (!$is_running) {
 			$wpdb->update($options_table, array('option_value' => 'false'), array('option_name' => 'scan_in_progress')); // Flag that a scan is in progress
@@ -182,8 +196,12 @@
 		$ignore_table = $wpdb->prefix . 'spellcheck_ignore';
 		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
 		set_time_limit(600); // Set PHP timeout limit in case of large website
+		global $pro_included;
+		$total_posts = 100;
+		if ($pro_included) $total_posts = 500;
 		$total_words = 0;
 		$post_count = 0;
+		$word_count = 0;
 		if (!$is_running) {
 			$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress')); // Flag that a scan is in progress
 			$start_time = time();
@@ -195,11 +213,11 @@
 		$post_types = get_post_types();
 		$post_type_list = array();
 		foreach ($post_types as $type) {
-			if ($type != 'revision' && $type != 'page')
+			if ($type != 'revision' && $type != 'page' && $type != 'slider' && $type != 'attachment' && $type != 'optionsframework')
 				array_push($post_type_list, $type);
 		}
 
-		$posts_list = get_posts(array('posts_per_page' => 100, 'post_type' => $post_type_list, 'post_status' => array('publish', 'draft')));
+		$posts_list = get_posts(array('posts_per_page' => PHP_INT_MAX, 'post_type' => $post_type_list, 'post_status' => array('publish', 'draft')));
 
 		foreach ($posts_list as $post) {
 			$ignore_flag = 'false';
@@ -211,16 +229,18 @@
 			if ($ignore_flag == 'true') { continue; }
 			$post_count++;
 			$words_list = $post->post_content;
-			$words_list = preg_replace("/(\[.*?\])/s",'',$words_list);
-			//$words_list = preg_replace("(\<.*?\>)",'',$words_list);
+			$words_list = preg_replace("/(\[.*?\])/s",' ',$words_list);
+			$words_list = preg_replace("(\<.*?\>)",' ',$words_list);
 			$words_list = preg_replace("/<style>\s\S*?<\/style>/",'',$words_list);
 			$words_list = html_entity_decode(strip_tags($words_list), ENT_QUOTES, 'utf-8');
 			if ($options_list[23]->option_value == 'true') {
-				$words_list = preg_replace('/\S+\@\S+\.\S+/', '', $words_list);
+				$words_list = preg_replace('/\S+\@\S+\.\S+/', ' ', $words_list);
 			}
 			if ($options_list[24]->option_value == 'true') {
-				$words_list = preg_replace('/http|https|ftp\S+/', '', $words_list);
-				$words_list = preg_replace('/www\.\S+/', '', $words_list);
+				//$words_list = preg_replace('/http|https|ftp\S+/', '', $words_list);
+				$words_list = preg_replace('/(https?|ftp):\/\/w{0,3}.[^ <]+/', ' ', $words_list);
+				$words_list = preg_replace('/w{3}.[^ <]+/', ' ', $words_list);
+				$words_list = preg_replace('/[a-z1-3]+.(com|ca)([^a-z1-3]|$)/', ' ', $words_list);
 			}
 			//$words_list = htmlspecialchars_decode($words_list);
 			$words_list = preg_replace("/[0-9]/", "", $words_list);
@@ -265,16 +285,24 @@
 					if (sizeof($dict_check) < 1) {
 						//Check if word already exists in the database for that page
 						if ((strtoupper($word) != $word || $caps_check[0]->option_value == 'false') && $word != '') {
+							if ($post_count <= $total_posts) {
 							$word = addslashes($word);
 							$wpdb->insert($table_name, array('word' => addslashes($word), 'page_name' => $post->post_title, 'page_type' => 'Post Content'));
+							} else {
+								$word_count++;
+							}
 						}
 					}
 				}	
 			}
 		}
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='pro_word_count';");
+		$word_count = $word_count + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $word_count), array('option_name' => 'pro_word_count'));
 		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='total_word_count';");
 		$total_words = $total_words + intval($counter[0]->option_value);
 		$wpdb->update($options_table, array('option_value' => $total_words), array('option_name' => 'total_word_count'));
+		if ($post_count > $total_posts) $post_count = $total_posts;
 		$wpdb->update($options_table, array('option_value' => $post_count), array('option_name' => 'post_count'));
 		if (!$is_running) {
 			$wpdb->update($options_table, array('option_value' => 'false'), array('option_name' => 'scan_in_progress')); // Flag that a scan is in progress
@@ -293,6 +321,7 @@
 		$wpdb->update($options_table, array('option_value' => '0'), array('option_name' => 'total_word_count')); // Clear out the total word count
 		$wpdb->update($options_table, array('option_value' => '0'), array('option_name' => 'page_count')); // Clear out the page count
 		$wpdb->update($options_table, array('option_value' => '0'), array('option_name' => 'post_count')); // Clear out the post count
+		$wpdb->update($options_table, array('option_value' => '0'), array('option_name' => 'media_count')); // Clear out the media count
 
 		$wpdb->delete($table_name, array('ignore_word' => false));
 	}
@@ -334,6 +363,20 @@
 			check_page_slugs_ent(true);
 		if ($settings[19]->option_value =='true')
 			check_post_slugs_ent(true);
+		if ($settings[30]->option_value =='true') {
+			check_smart_slider_titles_ent();
+			check_smart_slider_captions_ent();
+			check_it_slider_captions_ent();
+			check_it_slider_titles_ent();
+			check_slider_captions_ent();
+			check_slider_titles_ent();
+		}
+		if ($settings[31]->option_value =='true') {
+			check_media_titles_ent();
+			check_media_descriptions_ent();
+			check_media_captions_ent();
+			check_media_alt_ent();
+		}
 		} else {
 		if ($settings[4]->option_value == 'true')
 			check_pages(true);
@@ -368,6 +411,16 @@
 			check_seo_titles_free();
 			check_page_slugs_free();
 			check_post_slugs_free();
+			check_smart_slider_titles_free();
+			check_smart_slider_captions_free();
+			check_it_slider_captions_free();
+			check_it_slider_titles_free();
+			check_slider_captions_free();
+			check_slider_titles_free();
+			check_media_titles_free();
+			check_media_descriptions_free();
+			check_media_captions_free();
+			check_media_alt_free();
 		}
 		}
 		$wpdb->update($options_table, array('option_value' => 'false'), array('option_name' => 'scan_in_progress')); // Flag that a scan has finished
@@ -413,6 +466,24 @@
 			check_page_slugs_ent(true);
 		if ($settings[19]->option_value =='true')
 			check_post_slugs_ent(true);
+		if ($settings[30]->option_value =='true') {
+			if (is_plugin_active('smart-slider-2/smart-slider-2.php')) {
+				check_smart_slider_titles_ent(true);
+				check_smart_slider_captions_ent(true);
+			}
+			if (is_plugin_active('slider-image/slider.php')) {
+				check_it_slider_captions_ent(true);
+				check_it_slider_titles_ent(true);
+			}
+			check_slider_captions_ent(true);
+			check_slider_titles_ent(true);
+		}
+		if ($settings[31]->option_value =='true') {
+			check_media_titles_ent(true);
+			check_media_descriptions_ent(true);
+			check_media_captions_ent(true);
+			check_media_alt_ent(true);
+		}
 		} else {
 		if ($settings[4]->option_value == 'true')
 			check_pages(true);
@@ -437,6 +508,24 @@
 			check_page_slugs(true);
 		if ($settings[19]->option_value =='true')
 			check_post_slugs(true);
+		if ($settings[30]->option_value =='true') {
+			if (is_plugin_active('smart-slider-2/smart-slider-2.php')) {
+				check_smart_slider_titles(true);
+				check_smart_slider_captions(true);
+			}
+			if (is_plugin_active('slider-image/slider.php')) {
+				check_it_slider_captions(true);
+				check_it_slider_titles(true);
+			}
+			check_slider_captions(true);
+			check_slider_titles(true);
+		}
+		if ($settings[31]->option_value =='true') {
+			check_media_titles(true);
+			check_media_descriptions(true);
+			check_media_captions(true);
+			check_media_alt(true);
+		}
 		} else {
 			check_menus_free();
 			check_page_title_free();
@@ -447,6 +536,16 @@
 			check_seo_titles_free();
 			check_page_slugs_free();
 			check_post_slugs_free();
+			check_smart_slider_titles_free();
+			check_smart_slider_captions_free();
+			check_it_slider_captions_free();
+			check_it_slider_titles_free();
+			check_slider_captions_free();
+			check_slider_titles_free();
+			check_media_titles_free();
+			check_media_descriptions_free();
+			check_media_captions_free();
+			check_media_alt_free();
 		}
 		}
 		if ($settings[0]->option_value == 'true')
@@ -519,8 +618,9 @@
 
 		$settings = $wpdb->get_results('SELECT option_value FROM ' . $table_name . ' WHERE option_name="email_address";');
 		$words_list = $wpdb->get_results('SELECT word FROM ' . $words_table . ' WHERE ignore_word is false');
+		$login_url = wp_login_url();
 		
-		$output = 'Dear Admin, <br /><br />We have finished the scan of your website and detected ' . sizeof($words_list) . ' spelling errors. To view them you can log into your website administrator panel';
+		$output = 'Dear Admin, <br /><br />We have finished the scan of your website and detected ' . sizeof($words_list) . ' spelling errors. To view them you can <a href="' . $login_url . '">click here</a> to log into your website administrator panel';
 		$headers  = "MIME-Version: 1.0\r\n";
 		$headers .= "Content-type: text/html; charset=iso-8859-1\r\n";
 		$headers .= "From: " . get_option( 'admin_email' );
@@ -618,14 +718,16 @@
 		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
 		$table_name = $wpdb->prefix . 'spellcheck_words';
 		$options_table = $wpdb->prefix . 'spellcheck_options';
-		$word_count = 0;
 		$total_words = 0;
-		set_time_limit(600); // Set PHP timeout limit in case of large website
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
+		$word_count = 0;
 		$page_ids = get_all_page_ids();
 
-		$wpdb->delete($table_name, array('page_type' => 'Page Title')); //Clean out entries before rechecking it all
+		//$wpdb->delete($table_name, array('page_type' => 'Page Title')); //Clean out entries before rechecking it all
+		$max_pages = PHP_INT_MAX;
+		if (sizeof($page_ids) < PHP_INT_MAX) $max_pages = sizeof($page_ids);
 
-		for ($x=0; $x<sizeof($page_ids); $x++) {
+		for ($x=0; $x<$max_pages; $x++) {
 			$words = array();
 			$page = get_post( $page_ids[$x] );
 			$word_list = html_entity_decode(strip_tags($page->post_title), ENT_QUOTES, 'utf-8');
@@ -637,6 +739,7 @@
 			$word_list = str_replace("/",' ',$word_list);
 			$word_list = str_replace("-",' ',$word_list);
 			$word_list = str_replace("@",' ',$word_list);
+			$word_list = str_replace("|",' ',$word_list);
 			$word_list = str_replace("&",' ',$word_list);
 			$word_list = str_replace("*",' ',$word_list);
 			$word_list = str_replace("+",' ',$word_list);
@@ -645,6 +748,7 @@
 			$word_list = str_replace("…",'',$word_list);
 			$word_list = str_replace(";",' ',$word_list);
 			$word_list = str_replace("'s",'',$word_list);
+			$word_list = str_replace("’s",'',$word_list);
 			$word_list = str_replace("’","'",$word_list);
 			$word_list = str_replace("`","'",$word_list);
 			$word_list = str_replace("s'",'s',$word_list);
@@ -661,12 +765,11 @@
 				$word = trim($word);
 				$word = preg_replace("/[0-9]/", "", $word);
 				if (!check_word($word)) {
-					$word_check = $wpdb->get_results("SELECT word FROM " . $table_name . " WHERE word='".$word."' AND page_name='".$page->post_title."';");
 					$dict_word = str_replace("'", "\'", $word);
 					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
 					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
 
-					if (sizeof($word_check) < 1 && sizeof($dict_check) < 1) {
+					if (sizeof($dict_check) < 1) {
 						$word_count++;
 					}
 				}
@@ -686,13 +789,24 @@
 		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
 		$table_name = $wpdb->prefix . 'spellcheck_words';
 		$options_table = $wpdb->prefix . 'spellcheck_options';
-		$word_count = 0;
 		$total_words = 0;
-		set_time_limit(600); // Set PHP timeout limit in case of large website
+		$word_count = 0;
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
+		if (!$is_running) {
+			$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress')); // Flag that a scan is in progress
+			$start_time = time();
+		}
 
-		$wpdb->delete($table_name, array('page_type' => 'Post Title')); //Clean out entries before rechecking it all
+		//$wpdb->delete($table_name, array('page_type' => 'Post Title')); //Clean out entries before rechecking it all
 
-		$posts_list = get_posts(array('posts_per_page' => 20000, 'post_status' => array('publish', 'draft')));
+		$post_types = get_post_types();
+		$post_type_list = array();
+		foreach ($post_types as $type) {
+			if ($type != 'revision' && $type != 'page' && $type != 'nav_menu_item' && $type != 'optionsframework' && $type != 'slider' && $type != 'attachment')
+				array_push($post_type_list, $type);
+		}
+
+		$posts_list = get_posts(array('posts_per_page' => PHP_INT_MAX, 'post_type' => $post_type_list, 'post_status' => array('publish', 'draft')));
 
 		foreach ($posts_list as $post) {
 			$word_list = html_entity_decode(strip_tags($post->post_title), ENT_QUOTES, 'utf-8');
@@ -704,6 +818,7 @@
 			$word_list = str_replace("/",' ',$word_list);
 			$word_list = str_replace("-",' ',$word_list);
 			$word_list = str_replace("@",' ',$word_list);
+			$word_list = str_replace("|",' ',$word_list);
 			$word_list = str_replace("&",' ',$word_list);
 			$word_list = str_replace("*",' ',$word_list);
 			$word_list = str_replace("+",' ',$word_list);
@@ -712,6 +827,7 @@
 			$word_list = str_replace("…",'',$word_list);
 			$word_list = str_replace(";",' ',$word_list);
 			$word_list = str_replace("'s",'',$word_list);
+			$word_list = str_replace("’s",'',$word_list);
 			$word_list = str_replace("’","'",$word_list);
 			$word_list = str_replace("`","'",$word_list);
 			$word_list = str_replace("s'",'s',$word_list);
@@ -728,12 +844,11 @@
 				$word = trim($word);
 				$word = preg_replace("/[0-9]/", "", $word);
 				if (!check_word($word)) {
-					$word_check = $wpdb->get_results("SELECT word FROM " . $table_name . " WHERE word='".$word."' AND page_name='".$post->post_title."';");
 					$dict_word = str_replace("'", "\'", $word);
 					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
 					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
 
-					if (sizeof($word_check) < 1 && sizeof($dict_check) < 1) {
+					if (sizeof($dict_check) < 1) {
 						$word_count++;
 					}
 				}	
@@ -753,12 +868,16 @@ function check_post_tags_free() {
 		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
 		$table_name = $wpdb->prefix . 'spellcheck_words';
 		$options_table = $wpdb->prefix . 'spellcheck_options';
-		$word_count = 0;
 		$total_words = 0;
-		set_time_limit(600); // Set PHP timeout limit in case of large website
+		$word_count = 0;
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
+		if (!$is_running) {
+			$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress')); // Flag that a scan is in progress
+			$start_time = time();
+		}
 
-		$wpdb->delete($table_name, array('page_type' => 'Post Tag')); //Clean out entries before rechecking it all
-		$posts_list = get_posts(array('posts_per_page' => 20000, 'post_status' => array('publish', 'draft')));
+		//$wpdb->delete($table_name, array('page_type' => 'Post Tag')); //Clean out entries before rechecking it all
+		$posts_list = get_posts(array('posts_per_page' => PHP_INT_MAX, 'post_type' => 'post', 'post_status' => array('publish', 'draft')));
 
 		foreach ($posts_list as $post) {
 
@@ -778,12 +897,11 @@ function check_post_tags_free() {
 				$word = trim($word);
 				$word = preg_replace("/[0-9]/", "", $word);
 				if (!check_word($word)) {
-					$word_check = $wpdb->get_results("SELECT word FROM " . $table_name . " WHERE word='".$word."' AND page_name='".$post->post_title."';");
 					$dict_word = str_replace("'", "\'", $word);
 					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
 					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
 
-					if (sizeof($word_check) < 1 && sizeof($dict_check) < 1) {
+					if (sizeof($dict_check) < 1) {
 						$word_count++;
 					}
 				}	
@@ -804,12 +922,16 @@ function check_post_tags_free() {
 		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
 		$table_name = $wpdb->prefix . 'spellcheck_words';
 		$options_table = $wpdb->prefix . 'spellcheck_options';
-		$word_count = 0;
 		$total_words = 0;
-		set_time_limit(600); // Set PHP timeout limit in case of large website
+		$word_count = 0;
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
+		if (!$is_running) {
+			$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress')); // Flag that a scan is in progress
+			$start_time = time();
+		}
 
-		$wpdb->delete($table_name, array('page_type' => 'Post Category')); //Clean out entries before rechecking it all
-		$posts_list = get_posts(array('posts_per_page' => 20000, 'post_status' => array('publish', 'draft')));
+		//$wpdb->delete($table_name, array('page_type' => 'Post Category')); //Clean out entries before rechecking it all
+		$posts_list = get_posts(array('posts_per_page' => PHP_INT_MAX, 'post_type' => 'post', 'post_status' => array('publish', 'draft')));
 
 		foreach ($posts_list as $post) {
 			$cats = get_the_category($post->ID);
@@ -827,12 +949,11 @@ function check_post_tags_free() {
 				$word = trim($word);
 				$word = preg_replace("/[0-9]/", "", $word);
 				if (!check_word($word)) {
-					$word_check = $wpdb->get_results("SELECT word FROM " . $table_name . " WHERE word='".$word."' AND page_name='".$post->post_title."';");
 					$dict_word = str_replace("'", "\'", $word);
 					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
 					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
 
-					if (sizeof($word_check) < 1 && sizeof($dict_check) < 1) {
+					if (sizeof($dict_check) < 1) {
 						$word_count++;
 					}
 				}	
@@ -853,23 +974,34 @@ function check_post_tags_free() {
 		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
 		$table_name = $wpdb->prefix . 'postmeta';
 		$options_table = $wpdb->prefix . 'spellcheck_options';
+		$total_words = 0;
+		$word_count = 0;
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
 		$words_table = $wpdb->prefix . 'spellcheck_words';
 		$posts_table = $wpdb->prefix . 'posts';
-		$word_count = 0;
-		$total_words = 0;
-		set_time_limit(600); // Set PHP timeout limit in case of large website
+		if (!$is_running) {
+			$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress')); // Flag that a scan is in progress
+			$start_time = time();
+		}
+		$options_list = $wpdb->get_results("SELECT option_value FROM $options_table");
 
-		$wpdb->delete($words_table, array('page_type' => 'Yoast SEO Description')); //Clean out entries before rechecking it all
-		$wpdb->delete($words_table, array('page_type' => 'All in One SEO Description'));
-		$wpdb->delete($words_table, array('page_type' => 'Ultimate SEO Description'));
-		$wpdb->delete($words_table, array('page_type' => 'SEO Description'));
+		//$wpdb->delete($words_table, array('page_type' => 'Yoast SEO Description')); //Clean out entries before rechecking it all
+		//$wpdb->delete($words_table, array('page_type' => 'All in One SEO Description'));
+		//$wpdb->delete($words_table, array('page_type' => 'Ultimate SEO Description'));
+		//$wpdb->delete($words_table, array('page_type' => 'SEO Description'));
 
-		$results = $wpdb->get_results('SELECT post_id, meta_value, meta_key FROM ' . $table_name . ' WHERE meta_key="_yoast_wpseo_metadesc" OR meta_key="_aioseop_description" OR meta_key="_su_description"');
+		$results = $wpdb->get_results('SELECT post_id, meta_value, meta_key FROM ' . $table_name . ' WHERE meta_key="_yoast_wpseo_metadesc" OR meta_key="_aioseop_description" OR meta_key="_su_description" LIMIT 50000');
 
 		foreach($results as $desc) {
 			$page_results = $wpdb->get_results('SELECT post_title FROM ' . $posts_table . ' WHERE ID=' . $desc->post_id);
 			$desc_type = $desc->meta_key;
 			$desc = html_entity_decode(strip_tags($desc->meta_value), ENT_QUOTES, 'utf-8');
+			if ($options_list[23]->option_value == 'true') {
+				$desc = preg_replace('/\S+\@\S+\.\S+/', '', $desc);
+			}
+			if ($options_list[24]->option_value == 'true') {
+				$desc = preg_replace('#\bhttps?://[^\s()<>]+(?:\([\w\d]+\)|([^[:punct:]\s]|/))#', '', $desc);
+			}
 			$desc = preg_replace("/[0-9]/", " ", $desc);
 			$desc = preg_replace('/\s+/', ' ', $desc);
 			$desc = str_replace("\xA0", ' ',$desc);
@@ -878,6 +1010,7 @@ function check_post_tags_free() {
 			$desc = str_replace("/",' ',$desc);
 			$desc = str_replace("-",' ',$desc);
 			$desc = str_replace("@",' ',$desc);
+			$desc = str_replace("|",' ',$desc);
 			$desc = str_replace("&",' ',$desc);
 			$desc = str_replace("*",' ',$desc);
 			$desc = str_replace("+",' ',$desc);
@@ -886,6 +1019,7 @@ function check_post_tags_free() {
 			$desc = str_replace("…",'',$desc);
 			$desc = str_replace(";",' ',$desc);
 			$desc = str_replace("'s",'',$desc);
+			$desc = str_replace("’s",'',$desc);
 			$desc = str_replace("’","'",$desc);
 			$desc = str_replace("`","'",$desc);
 			$desc = str_replace("s'",'s',$desc);
@@ -903,16 +1037,12 @@ function check_post_tags_free() {
 				$word = trim($word);
 				$word = preg_replace("/[0-9]/", "", $word);
 				if (!check_word($word)) {
-					$word_check = $wpdb->get_results("SELECT word FROM " . $words_table . " WHERE word='".$word."' AND page_name='".$page_results[0]->post_title."';");
 					$dict_word = str_replace("'", "\'", $word);
 					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
 					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
 
-					if (sizeof($word_check) < 1 && sizeof($dict_check) < 1) {
-						//Check if word already exists in the database for that page
-						if ((strtoupper($word) != $word || $caps_check[0]->option_value == 'false') && $word != '') {
-							$word_count++;
-						}
+					if (sizeof($dict_check) < 1) {
+						$word_count++;
 					}
 				}
 			}
@@ -931,18 +1061,22 @@ function check_post_tags_free() {
 		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
 		$table_name = $wpdb->prefix . 'postmeta';
 		$options_table = $wpdb->prefix . 'spellcheck_options';
+		$total_words = 0;
+		$word_count = 0;
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
 		$words_table = $wpdb->prefix . 'spellcheck_words';
 		$posts_table = $wpdb->prefix . 'posts';
-		$word_count = 0;
-		$total_words = 0;
-		set_time_limit(600); // Set PHP timeout limit in case of large website
+		if (!$is_running) {
+			$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress')); // Flag that a scan is in progress
+			$start_time = time();
+		}
 
-		$wpdb->delete($words_table, array('page_type' => 'Yoast SEO Title')); //Clean out entries before rechecking it all
-		$wpdb->delete($words_table, array('page_type' => 'All in One SEO Title'));
-		$wpdb->delete($words_table, array('page_type' => 'Ultimate SEO Title'));
-		$wpdb->delete($words_table, array('page_type' => 'SEO Title'));
+		//$wpdb->delete($words_table, array('page_type' => 'Yoast SEO Title')); //Clean out entries before rechecking it all
+		//$wpdb->delete($words_table, array('page_type' => 'All in One SEO Title'));
+		//$wpdb->delete($words_table, array('page_type' => 'Ultimate SEO Title'));
+		//$wpdb->delete($words_table, array('page_type' => 'SEO Title'));
 
-		$results = $wpdb->get_results('SELECT post_id, meta_value, meta_key FROM ' . $table_name . ' WHERE meta_key="_yoast_wpseo_title" OR meta_key="_aioseop_title" OR meta_key="_su_title"');
+		$results = $wpdb->get_results('SELECT post_id, meta_value, meta_key FROM ' . $table_name . ' WHERE meta_key="_yoast_wpseo_title" OR meta_key="_aioseop_title" OR meta_key="_su_title" LIMIT 50000');
 
 		foreach($results as $desc) {
 			$page_results = $wpdb->get_results('SELECT post_title FROM ' . $posts_table . ' WHERE ID=' . $desc->post_id);
@@ -956,6 +1090,7 @@ function check_post_tags_free() {
 			$desc = str_replace("/",' ',$desc);
 			$desc = str_replace("-",' ',$desc);
 			$desc = str_replace("@",' ',$desc);
+			$desc = str_replace("|",' ',$desc);
 			$desc = str_replace("&",' ',$desc);
 			$desc = str_replace("*",' ',$desc);
 			$desc = str_replace("+",' ',$desc);
@@ -964,6 +1099,7 @@ function check_post_tags_free() {
 			$desc = str_replace("…",'',$desc);
 			$desc = str_replace(";",' ',$desc);
 			$desc = str_replace("'s",'',$desc);
+			$desc = str_replace("’s",'',$desc);
 			$desc = str_replace("’","'",$desc);
 			$desc = str_replace("`","'",$desc);
 			$desc = str_replace("s'",'s',$desc);
@@ -980,12 +1116,11 @@ function check_post_tags_free() {
 				$word = trim($word);
 				$word = preg_replace("/[0-9]/", "", $word);
 				if (!check_word($word)) {
-					$word_check = $wpdb->get_results("SELECT word FROM " . $words_table . " WHERE word='".$word."' AND page_name='".$page_results[0]->post_title."';");
 					$dict_word = str_replace("'", "\'", $word);
 					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
 					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
 
-					if (sizeof($word_check) < 1 && sizeof($dict_check) < 1) {
+					if (sizeof($dict_check) < 1) {
 						$word_count++;
 					}
 				}
@@ -1000,18 +1135,22 @@ function check_post_tags_free() {
 	}
 	add_action('admincheckseotitles', 'check_seo_titles');
 
-	function check_page_slugs_free() {
+function check_page_slugs_free() {
 		global $wpdb;
 		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
 		$options_table = $wpdb->prefix . 'spellcheck_options';
+		$total_words = 0;
+		$word_count = 0;
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
 		$words_table = $wpdb->prefix . 'spellcheck_words';
 		$posts_table = $wpdb->prefix . 'posts';
-		$word_count = 0;
-		$total_words = 0;
-		set_time_limit(600); // Set PHP timeout limit in case of large website
+		if (!$is_running) {
+			$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress')); // Flag that a scan is in progress
+			$start_time = time();
+		}
 
-		$wpdb->delete($words_table, array('page_type' => 'Page Slug')); //Clean out entries before rechecking it all
-		$results = $wpdb->get_results('SELECT post_name, post_title FROM ' . $posts_table . ' WHERE post_type="page"');
+		//$wpdb->delete($words_table, array('page_type' => 'Page Slug')); //Clean out entries before rechecking it all
+		$results = $wpdb->get_results('SELECT post_name, post_title FROM ' . $posts_table . ' WHERE post_type="page" LIMIT 50000');
 
 		foreach($results as $desc) {
 			$desc_title = $desc->post_title;
@@ -1028,12 +1167,11 @@ function check_post_tags_free() {
 				$word = trim($word);
 				$word = preg_replace("/[0-9]/", "", $word);
 				if (!check_word($word) && !check_word(ucfirst($word))) {
-					$word_check = $wpdb->get_results("SELECT word FROM " . $words_table . " WHERE word='".$word."' AND page_name='".$page_results[0]->post_title."';");
 					$dict_word = str_replace("'", "\'", $word);
 					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
 					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
 
-					if (sizeof($word_check) < 1 && sizeof($dict_check) < 1) {
+					if (sizeof($dict_check) < 1) {
 						$word_count++;
 					}
 				}
@@ -1052,13 +1190,18 @@ function check_post_tags_free() {
 		global $wpdb;
 		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
 		$options_table = $wpdb->prefix . 'spellcheck_options';
+		$total_words = 0;
+		$word_count = 0;
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
 		$words_table = $wpdb->prefix . 'spellcheck_words';
 		$posts_table = $wpdb->prefix . 'posts';
-		$word_count = 0;
-		set_time_limit(600); // Set PHP timeout limit in case of large website
+		if (!$is_running) {
+			$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress')); // Flag that a scan is in progress
+			$start_time = time();
+		}
 
-		$wpdb->delete($words_table, array('page_type' => 'Post Slug')); //Clean out entries before rechecking it all
-		$results = $wpdb->get_results('SELECT post_name, post_title FROM ' . $posts_table . ' WHERE post_type="post"');
+		//$wpdb->delete($words_table, array('page_type' => 'Post Slug')); //Clean out entries before rechecking it all
+		$results = $wpdb->get_results('SELECT post_name, post_title FROM ' . $posts_table . ' WHERE post_type="post" LIMIT 50000');
 
 		foreach($results as $desc) {
 			$desc_title = $desc->post_title;
@@ -1075,12 +1218,11 @@ function check_post_tags_free() {
 				$word = trim($word);
 				$word = preg_replace("/[0-9]/", "", $word);
 				if (!check_word($word) && !check_word(ucfirst($word))) {
-					$word_check = $wpdb->get_results("SELECT word FROM " . $words_table . " WHERE word='".$word."' AND page_name='".$page_results[0]->post_title."';");
 					$dict_word = str_replace("'", "\'", $word);
 					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
 					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
 
-					if (sizeof($word_check) < 1 && sizeof($dict_check) < 1) {
+					if (sizeof($dict_check) < 1) {
 						$word_count++;
 					}
 				}
@@ -1094,4 +1236,742 @@ function check_post_tags_free() {
 		$wpdb->update($options_table, array('option_value' => $total_words), array('option_name' => 'total_word_count'));
 	}
 	add_action('admincheckpostslugs', 'check_post_slugs');
+
+	function check_slider_titles_free() {
+		global $wpdb;
+		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
+		$table_name = $wpdb->prefix . 'spellcheck_words';
+		$options_table = $wpdb->prefix . 'spellcheck_options';
+		$total_words = 0;
+		$word_count = 0;
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
+
+		$posts_list = get_posts(array('posts_per_page' => PHP_INT_MAX, 'post_type' => 'slider', 'post_status' => array('publish', 'draft')));
+
+		foreach ($posts_list as $post) {
+			$word_list = html_entity_decode(strip_tags($post->post_title), ENT_QUOTES, 'utf-8');
+			$word_list = preg_replace("/[0-9]/", " ", $word_list);
+			$word_list = preg_replace('/\s+/', ' ', $word_list);
+			$word_list = str_replace("\xA0", ' ',$word_list);
+			$word_list = str_replace("\xC2", '',$word_list);
+			$word_list = str_replace("&nbsp;", ' ',$word_list);
+			$word_list = str_replace("/",' ',$word_list);
+			$word_list = str_replace("-",' ',$word_list);
+			$word_list = str_replace("@",' ',$word_list);
+			$word_list = str_replace("|",' ',$word_list);
+			$word_list = str_replace("&",' ',$word_list);
+			$word_list = str_replace("*",' ',$word_list);
+			$word_list = str_replace("+",' ',$word_list);
+			$word_list = str_replace("#",' ',$word_list);
+			$word_list = str_replace("?",' ',$word_list);
+			$word_list = str_replace("…",'',$word_list);
+			$word_list = str_replace(";",' ',$word_list);
+			$word_list = str_replace("'s",'',$word_list);
+			$word_list = str_replace("’s",'',$word_list);
+			$word_list = str_replace("’","'",$word_list);
+			$word_list = str_replace("`","'",$word_list);
+			$word_list = str_replace("s'",'s',$word_list);
+			$word_list = str_replace(".",' ',$word_list);
+			$words = explode(' ', $word_list);
+		
+			foreach($words as $word) {
+				$total_words++;
+				$word = str_replace(' ', '', $word);
+				$word = str_replace('=', '', $word);
+				$word = str_replace(',', '', $word);
+				$word = trim($word, "?!.,'()`”:“@$#-%\=/");
+				$word = trim($word, '"');
+				$word = trim($word);
+				$word = preg_replace("/[0-9]/", "", $word);
+				if (!check_word($word)) {
+					$dict_word = str_replace("'", "\'", $word);
+					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
+					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
+
+					if (sizeof($dict_check) < 1) {
+						$word_count++;
+					}
+				}	
+			}
+		}
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='pro_word_count';");
+		$word_count = $word_count + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $word_count), array('option_name' => 'pro_word_count'));
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='total_word_count';");
+		$total_words = $total_words + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $total_words), array('option_name' => 'total_word_count'));
+	}
+
+	function check_slider_captions_free() {
+		global $wpdb;
+		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
+		$table_name = $wpdb->prefix . 'spellcheck_words';
+		$options_table = $wpdb->prefix . 'spellcheck_options';
+		$total_words = 0;
+		$word_count = 0;
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
+
+		$posts_list = get_posts(array('posts_per_page' => 500, 'post_type' => 'slider', 'post_status' => array('publish', 'draft')));
+
+		foreach ($posts_list as $post) {
+			$word_list = get_post_meta ($post->ID, 'my_slider_caption', true );
+			$word_list = html_entity_decode(strip_tags($word_list), ENT_QUOTES, 'utf-8');
+			$word_list = preg_replace("/[0-9]/", " ", $word_list);
+			$word_list = preg_replace('/\s+/', ' ', $word_list);
+			$word_list = str_replace("\xA0", ' ',$word_list);
+			$word_list = str_replace("\xC2", '',$word_list);
+			$word_list = str_replace("&nbsp;", ' ',$word_list);
+			$word_list = str_replace("/",' ',$word_list);
+			$word_list = str_replace("-",' ',$word_list);
+			$word_list = str_replace("@",' ',$word_list);
+			$word_list = str_replace("|",' ',$word_list);
+			$word_list = str_replace("&",' ',$word_list);
+			$word_list = str_replace("*",' ',$word_list);
+			$word_list = str_replace("+",' ',$word_list);
+			$word_list = str_replace("#",' ',$word_list);
+			$word_list = str_replace("?",' ',$word_list);
+			$word_list = str_replace("…",'',$word_list);
+			$word_list = str_replace(";",' ',$word_list);
+			$word_list = str_replace("'s",'',$word_list);
+			$word_list = str_replace("’s",'',$word_list);
+			$word_list = str_replace("’","'",$word_list);
+			$word_list = str_replace("`","'",$word_list);
+			$word_list = str_replace("s'",'s',$word_list);
+			$word_list = str_replace(".",' ',$word_list);
+			$word_list = str_replace("<",' ',$word_list);
+			$word_list = str_replace(">",' ',$word_list);
+			$words = explode(' ', $word_list);
+		
+			foreach($words as $word) {
+				$total_words++;
+				$word = str_replace(' ', '', $word);
+				$word = str_replace('=', '', $word);
+				$word = str_replace(',', '', $word);
+				$word = trim($word, "?!.,'()`”:“@$#-%\=/");
+				$word = trim($word, '"');
+				$word = trim($word);
+				$word = preg_replace("/[0-9]/", "", $word);
+				if (!check_word($word)) {
+					$dict_word = str_replace("'", "\'", $word);
+					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
+					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
+
+					if (sizeof($dict_check) < 1) {
+						$word_count++;
+					}
+				}	
+			}
+		}
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='pro_word_count';");
+		$word_count = $word_count + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $word_count), array('option_name' => 'pro_word_count'));
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='total_word_count';");
+		$total_words = $total_words + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $total_words), array('option_name' => 'total_word_count'));
+	}
+
+/* Slider Plugins */
+
+function check_it_slider_titles_free() {
+		global $wpdb;
+		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
+		$table_name = $wpdb->prefix . 'wp_huge_itslider_images';
+		$options_table = $wpdb->prefix . 'spellcheck_options';
+		$total_words = 0;
+		$word_count = 0;
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
+
+		$posts_list = $wpdb->get_results("SELECT sl_stitle FROM $table_name");
+
+		foreach ($posts_list as $post) {
+			$word_list = html_entity_decode(strip_tags($post->sl_stitle), ENT_QUOTES, 'utf-8');
+			$word_list = preg_replace("/[0-9]/", " ", $word_list);
+			$word_list = preg_replace('/\s+/', ' ', $word_list);
+			$word_list = str_replace("\xA0", ' ',$word_list);
+			$word_list = str_replace("\xC2", '',$word_list);
+			$word_list = str_replace("&nbsp;", ' ',$word_list);
+			$word_list = str_replace("/",' ',$word_list);
+			$word_list = str_replace("-",' ',$word_list);
+			$word_list = str_replace("@",' ',$word_list);
+			$word_list = str_replace("|",' ',$word_list);
+			$word_list = str_replace("&",' ',$word_list);
+			$word_list = str_replace("*",' ',$word_list);
+			$word_list = str_replace("+",' ',$word_list);
+			$word_list = str_replace("#",' ',$word_list);
+			$word_list = str_replace("?",' ',$word_list);
+			$word_list = str_replace("…",'',$word_list);
+			$word_list = str_replace(";",' ',$word_list);
+			$word_list = str_replace("'s",'',$word_list);
+			$word_list = str_replace("’s",'',$word_list);
+			$word_list = str_replace("’","'",$word_list);
+			$word_list = str_replace("`","'",$word_list);
+			$word_list = str_replace("s'",'s',$word_list);
+			$word_list = str_replace(".",' ',$word_list);
+			$words = explode(' ', $word_list);
+		
+			foreach($words as $word) {
+				$total_words++;
+				$word = str_replace(' ', '', $word);
+				$word = str_replace('=', '', $word);
+				$word = str_replace(',', '', $word);
+				$word = trim($word, "?!.,'()`”:“@$#-%\=/");
+				$word = trim($word, '"');
+				$word = trim($word);
+				$word = preg_replace("/[0-9]/", "", $word);
+				if (!check_word($word)) {
+					$dict_word = str_replace("'", "\'", $word);
+					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
+					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
+
+					if (sizeof($dict_check) < 1) {
+						$word_count++;
+				}	
+			}
+		}
+		}
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='pro_word_count';");
+		$word_count = $word_count + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $word_count), array('option_name' => 'pro_word_count'));
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='total_word_count';");
+		$total_words = $total_words + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $total_words), array('option_name' => 'total_word_count'));
+	}
+
+	function check_it_slider_captions_free() {
+		global $wpdb;
+		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
+		$table_name = $wpdb->prefix . 'wp_huge_itslider_images';
+		$options_table = $wpdb->prefix . 'spellcheck_options';
+		$total_words = 0;
+		$word_count = 0;
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
+
+		$posts_list = $wpdb->get_results("SELECT sl_sdesc, sl_stitle FROM $table_name");
+
+		foreach ($posts_list as $post) {
+			$word_list = html_entity_decode(strip_tags($post->sl_sdesc), ENT_QUOTES, 'utf-8');
+			$word_list = preg_replace("/[0-9]/", " ", $word_list);
+			$word_list = preg_replace('/\s+/', ' ', $word_list);
+			$word_list = str_replace("\xA0", ' ',$word_list);
+			$word_list = str_replace("\xC2", '',$word_list);
+			$word_list = str_replace("&nbsp;", ' ',$word_list);
+			$word_list = str_replace("/",' ',$word_list);
+			$word_list = str_replace("-",' ',$word_list);
+			$word_list = str_replace("@",' ',$word_list);
+			$word_list = str_replace("|",' ',$word_list);
+			$word_list = str_replace("&",' ',$word_list);
+			$word_list = str_replace("*",' ',$word_list);
+			$word_list = str_replace("+",' ',$word_list);
+			$word_list = str_replace("#",' ',$word_list);
+			$word_list = str_replace("?",' ',$word_list);
+			$word_list = str_replace("…",'',$word_list);
+			$word_list = str_replace(";",' ',$word_list);
+			$word_list = str_replace("'s",'',$word_list);
+			$word_list = str_replace("’s",'',$word_list);
+			$word_list = str_replace("’","'",$word_list);
+			$word_list = str_replace("`","'",$word_list);
+			$word_list = str_replace("s'",'s',$word_list);
+			$word_list = str_replace(".",' ',$word_list);
+			$word_list = str_replace("<",' ',$word_list);
+			$word_list = str_replace(">",' ',$word_list);
+			$words = explode(' ', $word_list);
+		
+			foreach($words as $word) {
+				$total_words++;
+				$word = str_replace(' ', '', $word);
+				$word = str_replace('=', '', $word);
+				$word = str_replace(',', '', $word);
+				$word = trim($word, "?!.,'()`”:“@$#-%\=/");
+				$word = trim($word, '"');
+				$word = trim($word);
+				$word = preg_replace("/[0-9]/", "", $word);
+				if (!check_word($word)) {
+					$dict_word = str_replace("'", "\'", $word);
+					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
+					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
+
+					if (sizeof($dict_check) < 1) {
+						$word_count++;
+					}
+				}	
+			}
+		}
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='pro_word_count';");
+		$word_count = $word_count + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $word_count), array('option_name' => 'pro_word_count'));
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='total_word_count';");
+		$total_words = $total_words + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $total_words), array('option_name' => 'total_word_count'));
+	}
+
+/* Smart Slider 2 */
+
+function check_smart_slider_titles_free() {
+		global $wpdb;
+		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
+		$table_name = $wpdb->prefix . 'wp_nextend_smartslider_slides';
+		$options_table = $wpdb->prefix . 'spellcheck_options';
+		$total_words = 0;
+		$word_count = 0;
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
+
+		$posts_list = $wpdb->get_results("SELECT title FROM $table_name");
+
+		foreach ($posts_list as $post) {
+			$word_list = html_entity_decode(strip_tags($post->title), ENT_QUOTES, 'utf-8');
+			$word_list = preg_replace("/[0-9]/", " ", $word_list);
+			$word_list = preg_replace('/\s+/', ' ', $word_list);
+			$word_list = str_replace("\xA0", ' ',$word_list);
+			$word_list = str_replace("\xC2", '',$word_list);
+			$word_list = str_replace("&nbsp;", ' ',$word_list);
+			$word_list = str_replace("/",' ',$word_list);
+			$word_list = str_replace("-",' ',$word_list);
+			$word_list = str_replace("@",' ',$word_list);
+			$word_list = str_replace("|",' ',$word_list);
+			$word_list = str_replace("&",' ',$word_list);
+			$word_list = str_replace("*",' ',$word_list);
+			$word_list = str_replace("+",' ',$word_list);
+			$word_list = str_replace("#",' ',$word_list);
+			$word_list = str_replace("?",' ',$word_list);
+			$word_list = str_replace("…",'',$word_list);
+			$word_list = str_replace(";",' ',$word_list);
+			$word_list = str_replace("'s",'',$word_list);
+			$word_list = str_replace("’s",'',$word_list);
+			$word_list = str_replace("’","'",$word_list);
+			$word_list = str_replace("`","'",$word_list);
+			$word_list = str_replace("s'",'s',$word_list);
+			$word_list = str_replace(".",' ',$word_list);
+			$words = explode(' ', $word_list);
+		
+			foreach($words as $word) {
+				$total_words++;
+				$word = str_replace(' ', '', $word);
+				$word = str_replace('=', '', $word);
+				$word = str_replace(',', '', $word);
+				$word = trim($word, "?!.,'()`”:“@$#-%\=/");
+				$word = trim($word, '"');
+				$word = trim($word);
+				$word = preg_replace("/[0-9]/", "", $word);
+				if (!check_word($word)) {
+					$dict_word = str_replace("'", "\'", $word);
+					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
+					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
+
+					if (sizeof($dict_check) < 1) {
+						$word_count++;
+					}
+				}	
+			}
+		}
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='pro_word_count';");
+		$word_count = $word_count + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $word_count), array('option_name' => 'pro_word_count'));
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='total_word_count';");
+		$total_words = $total_words + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $total_words), array('option_name' => 'total_word_count'));
+	}
+
+	function check_smart_slider_captions_free() {
+		global $wpdb;
+		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
+		$table_name = $wpdb->prefix . 'wp_nextend_smartslider_slides';
+		$options_table = $wpdb->prefix . 'spellcheck_options';
+		$total_words = 0;
+		$word_count = 0;
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
+
+		$posts_list = $wpdb->get_results("SELECT description, title FROM $table_name");
+
+		foreach ($posts_list as $post) {
+			$word_list = html_entity_decode(strip_tags($post->description), ENT_QUOTES, 'utf-8');
+			$word_list = preg_replace("/[0-9]/", " ", $word_list);
+			$word_list = preg_replace('/\s+/', ' ', $word_list);
+			$word_list = str_replace("\xA0", ' ',$word_list);
+			$word_list = str_replace("\xC2", '',$word_list);
+			$word_list = str_replace("&nbsp;", ' ',$word_list);
+			$word_list = str_replace("/",' ',$word_list);
+			$word_list = str_replace("-",' ',$word_list);
+			$word_list = str_replace("@",' ',$word_list);
+			$word_list = str_replace("|",' ',$word_list);
+			$word_list = str_replace("&",' ',$word_list);
+			$word_list = str_replace("*",' ',$word_list);
+			$word_list = str_replace("+",' ',$word_list);
+			$word_list = str_replace("#",' ',$word_list);
+			$word_list = str_replace("?",' ',$word_list);
+			$word_list = str_replace("…",'',$word_list);
+			$word_list = str_replace(";",' ',$word_list);
+			$word_list = str_replace("'s",'',$word_list);
+			$word_list = str_replace("’s",'',$word_list);
+			$word_list = str_replace("’","'",$word_list);
+			$word_list = str_replace("`","'",$word_list);
+			$word_list = str_replace("s'",'s',$word_list);
+			$word_list = str_replace(".",' ',$word_list);
+			$word_list = str_replace("<",' ',$word_list);
+			$word_list = str_replace(">",' ',$word_list);
+			$words = explode(' ', $word_list);
+		
+			foreach($words as $word) {
+				$total_words++;
+				$word = str_replace(' ', '', $word);
+				$word = str_replace('=', '', $word);
+				$word = str_replace(',', '', $word);
+				$word = trim($word, "?!.,'()`”:“@$#-%\=/");
+				$word = trim($word, '"');
+				$word = trim($word);
+				$word = preg_replace("/[0-9]/", "", $word);
+				if (!check_word($word)) {
+					$dict_word = str_replace("'", "\'", $word);
+					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
+					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
+
+					if (sizeof($dict_check) < 1) {
+						$word_count++;
+					}
+				}	
+			}
+		}
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='pro_word_count';");
+		$word_count = $word_count + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $word_count), array('option_name' => 'pro_word_count'));
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='total_word_count';");
+		$total_words = $total_words + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $total_words), array('option_name' => 'total_word_count'));
+	}
+
+
+function check_media_titles_free() {
+		global $wpdb;
+		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
+		$table_name = $wpdb->prefix . 'spellcheck_words';
+		$options_table = $wpdb->prefix . 'spellcheck_options';
+		$total_words = 0;
+		$media_count = 0;
+		$word_count = 0;
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
+		if (!$is_running) {
+			$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress')); // Flag that a scan is in progress
+			$start_time = time();
+		}
+
+		$posts_list = get_posts(array('posts_per_page' => PHP_INT_MAX, 'post_type' => 'attachment'));
+
+		foreach ($posts_list as $post) {
+			$media_count++;
+			$word_list = html_entity_decode(strip_tags($post->post_title), ENT_QUOTES, 'utf-8');
+			$word_list = preg_replace("/[0-9]/", " ", $word_list);
+			$word_list = preg_replace('/\s+/', ' ', $word_list);
+			$word_list = str_replace("\xA0", ' ',$word_list);
+			$word_list = str_replace("\xC2", '',$word_list);
+			$word_list = str_replace("&nbsp;", ' ',$word_list);
+			$word_list = str_replace("/",' ',$word_list);
+			$word_list = str_replace("-",' ',$word_list);
+			$word_list = str_replace("@",' ',$word_list);
+			$word_list = str_replace("|",' ',$word_list);
+			$word_list = str_replace("&",' ',$word_list);
+			$word_list = str_replace("*",' ',$word_list);
+			$word_list = str_replace("+",' ',$word_list);
+			$word_list = str_replace("#",' ',$word_list);
+			$word_list = str_replace("?",' ',$word_list);
+			$word_list = str_replace("…",'',$word_list);
+			$word_list = str_replace(";",' ',$word_list);
+			$word_list = str_replace("'s",'',$word_list);
+			$word_list = str_replace("’s",'',$word_list);
+			$word_list = str_replace("’","'",$word_list);
+			$word_list = str_replace("`","'",$word_list);
+			$word_list = str_replace("s'",'s',$word_list);
+			$word_list = str_replace(".",' ',$word_list);
+			$word_list = str_replace("_",' ',$word_list);
+			$words = explode(' ', $word_list);
+		
+			foreach($words as $word) {
+				$total_words++;
+				$word = str_replace(' ', '', $word);
+				$word = str_replace('=', '', $word);
+				$word = str_replace(',', '', $word);
+				$word = trim($word, "?!.,'()`”:“@$#-%\=/");
+				$word = trim($word, '"');
+				$word = trim($word);
+				$word = preg_replace("/[0-9]/", "", $word);
+				if (!check_word($word)) {
+					$dict_word = str_replace("'", "\'", $word);
+					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
+					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
+
+					if (sizeof($dict_check) < 1) {
+						$word_count++;
+					}
+				}	
+			}
+		}
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='pro_word_count';");
+		$word_count = $word_count + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $word_count), array('option_name' => 'pro_word_count'));
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='total_word_count';");
+		$total_words = $total_words + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $total_words), array('option_name' => 'total_word_count'));
+	}
+
+	function check_media_descriptions_free() {
+		global $wpdb;
+		$table_name = $wpdb->prefix . 'spellcheck_words';
+		$options_table = $wpdb->prefix . 'spellcheck_options';
+		$ignore_table = $wpdb->prefix . 'spellcheck_ignore';
+		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
+		$total_words = 0;
+		$media_count = 0;
+		$word_count = 0;
+		if (!$is_running) {
+			$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress')); // Flag that a scan is in progress
+			$start_time = time();
+		}
+
+		$ignore_posts = $wpdb->get_results('SELECT keyword FROM ' . $ignore_table . ' WHERE type="page";');
+		$options_list = $wpdb->get_results("SELECT option_value FROM $options_table");
+
+		$posts_list = get_posts(array('posts_per_page' => PHP_INT_MAX, 'post_type' => 'attachment'));
+
+		foreach ($posts_list as $post) {
+			$media_count++;
+			$ignore_flag = 'false';
+			foreach($ignore_posts as $ignore_check) {
+				if (strtoupper($post->post_title) == strtoupper($ignore_check->keyword)) {
+					$ignore_flag = 'true';
+				}
+			}
+			if ($ignore_flag == 'true') { continue; }
+			$words_list = $post->post_content;
+			$words_list = preg_replace("(\[.*?\])",'',$words_list);
+			//$words_list = preg_replace("(\<.*?\>)",'',$words_list);
+			$words_list = preg_replace("/<style>\s\S*?<\/style>/",'',$words_list);
+			$words_list = html_entity_decode(strip_tags($words_list), ENT_QUOTES, 'utf-8');
+			if ($options_list[23]->option_value == 'true') {
+				$words_list = preg_replace('/\S+\@\S+\.\S+/', '', $words_list);
+			}
+			if ($options_list[24]->option_value == 'true') {
+				$words_list = preg_replace('/http|https|ftp\S+/', '', $words_list);
+				$words_list = preg_replace('/www\.\S+/', '', $words_list);
+			}
+			//$words_list = htmlspecialchars_decode($words_list);
+			$words_list = preg_replace("/[0-9]/", "", $words_list);
+			$words_list = preg_replace("/[^a-zA-z'’`]/", " ", $words_list);
+			$words_list = preg_replace('/\s+/', ' ', $words_list);
+			$words_list = str_replace("\xA0", ' ',$words_list);
+			$words_list = str_replace("\xC2", '',$words_list);
+			$words_list = str_replace("&nbsp;", ' ',$words_list);
+			$words_list = str_replace('/',' ',$words_list);
+			$words_list = str_replace("-",' ',$words_list);
+			$words_list = str_replace("|",' ',$words_list);
+			$words_list = str_replace("@",' ',$words_list);
+			$words_list = str_replace("&",' ',$words_list);
+			$words_list = str_replace("#",' ',$words_list);
+			$words_list = str_replace("+",' ',$words_list);
+			$words_list = str_replace("*",'',$words_list);
+			$words_list = str_replace("?",' ',$words_list);
+			$words_list = str_replace("…",' ',$words_list);
+			$words_list = str_replace(";",' ',$words_list);
+			$words_list = str_replace("’","'",$words_list);
+			$words_list = str_replace("`","'",$words_list);
+			$words_list = str_replace("'s",'',$words_list);
+			$words_list = str_replace("’s",'',$words_list);
+			$words_list = str_replace("s'",'s',$words_list);
+			$words_list = str_replace(".",' ',$words_list);
+			$words = explode(' ', $words_list);
+		
+			foreach($words as $word) {
+				$total_words++;
+				$word = str_replace(' ', '', $word);
+				$word = str_replace('=', '', $word);
+				$word = str_replace(',', '', $word);
+				$word = trim($word, "?!.,'()`”:“@$#-%\=/");
+				$word = trim($word, '"');
+				$word = trim($word);
+				$word = preg_replace("/[0-9]/", "", $word);
+				if (!check_word($word)) {
+					$dict_word = str_replace("'", "\'", $word);
+					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
+					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
+
+					if (sizeof($dict_check) < 1) {
+						$word_count++;
+					}
+				}	
+			}
+		}
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='pro_word_count';");
+		$word_count = $word_count + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $word_count), array('option_name' => 'pro_word_count'));
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='total_word_count';");
+		$total_words = $total_words + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $total_words), array('option_name' => 'total_word_count'));
+	}
+
+	function check_media_captions_free() {
+		global $wpdb;
+		$table_name = $wpdb->prefix . 'spellcheck_words';
+		$options_table = $wpdb->prefix . 'spellcheck_options';
+		$ignore_table = $wpdb->prefix . 'spellcheck_ignore';
+		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
+		$total_words = 0;
+		$media_count = 0;
+		$word_count = 0;
+		if (!$is_running) {
+			$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress')); // Flag that a scan is in progress
+			$start_time = time();
+		}
+
+		$ignore_posts = $wpdb->get_results('SELECT keyword FROM ' . $ignore_table . ' WHERE type="page";');
+		$options_list = $wpdb->get_results("SELECT option_value FROM $options_table");
+
+		$posts_list = get_posts(array('posts_per_page' => PHP_INT_MAX, 'post_type' => 'attachment'));
+
+		foreach ($posts_list as $post) {
+			$media_count++;
+			$ignore_flag = 'false';
+			foreach($ignore_posts as $ignore_check) {
+				if (strtoupper($post->post_title) == strtoupper($ignore_check->keyword)) {
+					$ignore_flag = 'true';
+				}
+			}
+			if ($ignore_flag == 'true') { continue; }
+			$words_list = $post->post_excerpt;
+			$words_list = preg_replace("(\[.*?\])",'',$words_list);
+			//$words_list = preg_replace("(\<.*?\>)",'',$words_list);
+			$words_list = preg_replace("/<style>\s\S*?<\/style>/",'',$words_list);
+			$words_list = html_entity_decode(strip_tags($words_list), ENT_QUOTES, 'utf-8');
+			if ($options_list[23]->option_value == 'true') {
+				$words_list = preg_replace('/\S+\@\S+\.\S+/', '', $words_list);
+			}
+			if ($options_list[24]->option_value == 'true') {
+				$words_list = preg_replace('/http|https|ftp\S+/', '', $words_list);
+				$words_list = preg_replace('/www\.\S+/', '', $words_list);
+			}
+			//$words_list = htmlspecialchars_decode($words_list);
+			$words_list = preg_replace("/[0-9]/", "", $words_list);
+			$words_list = preg_replace("/[^a-zA-z'’`]/", " ", $words_list);
+			$words_list = preg_replace('/\s+/', ' ', $words_list);
+			$words_list = str_replace("\xA0", ' ',$words_list);
+			$words_list = str_replace("\xC2", '',$words_list);
+			$words_list = str_replace("&nbsp;", ' ',$words_list);
+			$words_list = str_replace('/',' ',$words_list);
+			$words_list = str_replace("-",' ',$words_list);
+			$words_list = str_replace("|",' ',$words_list);
+			$words_list = str_replace("@",' ',$words_list);
+			$words_list = str_replace("&",' ',$words_list);
+			$words_list = str_replace("#",' ',$words_list);
+			$words_list = str_replace("+",' ',$words_list);
+			$words_list = str_replace("*",'',$words_list);
+			$words_list = str_replace("?",' ',$words_list);
+			$words_list = str_replace("…",' ',$words_list);
+			$words_list = str_replace(";",' ',$words_list);
+			$words_list = str_replace("’","'",$words_list);
+			$words_list = str_replace("`","'",$words_list);
+			$words_list = str_replace("'s",'',$words_list);
+			$words_list = str_replace("’s",'',$words_list);
+			$words_list = str_replace("s'",'s',$words_list);
+			$words_list = str_replace(".",' ',$words_list);
+			$words = explode(' ', $words_list);
+		
+			foreach($words as $word) {
+				$total_words++;
+				$word = str_replace(' ', '', $word);
+				$word = str_replace('=', '', $word);
+				$word = str_replace(',', '', $word);
+				$word = trim($word, "?!.,'()`”:“@$#-%\=/");
+				$word = trim($word, '"');
+				$word = trim($word);
+				$word = preg_replace("/[0-9]/", "", $word);
+				if (!check_word($word)) {
+					$dict_word = str_replace("'", "\'", $word);
+					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
+					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
+
+					if (sizeof($dict_check) < 1) {
+						$word_count++;
+					}
+				}	
+			}
+		}
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='pro_word_count';");
+		$word_count = $word_count + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $word_count), array('option_name' => 'pro_word_count'));
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='total_word_count';");
+		$total_words = $total_words + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $total_words), array('option_name' => 'total_word_count'));
+	}
+
+	function check_media_alt_free() {
+		global $wpdb;
+		$dict_table = $wpdb->prefix . 'spellcheck_dictionary';
+		$table_name = $wpdb->prefix . 'spellcheck_words';
+		$options_table = $wpdb->prefix . 'spellcheck_options';
+		$total_words = 0;
+		$media_count = 0;
+		$word_count = 0;
+		set_time_limit(6000); // Set PHP timeout limit in case of large website
+		if (!$is_running) {
+			$wpdb->update($options_table, array('option_value' => 'true'), array('option_name' => 'scan_in_progress')); // Flag that a scan is in progress
+			$start_time = time();
+		}
+
+		$posts_list = get_posts(array('posts_per_page' => PHP_INT_MAX, 'post_type' => 'attachment'));
+
+		foreach ($posts_list as $post) {
+			$media_count++;
+			$word_list = get_post_meta ($post->ID, '_wp_attachment_image_alt', true );
+			$word_list = html_entity_decode(strip_tags($word_list), ENT_QUOTES, 'utf-8');
+			$word_list = preg_replace("/[0-9]/", " ", $word_list);
+			$word_list = preg_replace('/\s+/', ' ', $word_list);
+			$word_list = str_replace("\xA0", ' ',$word_list);
+			$word_list = str_replace("\xC2", '',$word_list);
+			$word_list = str_replace("&nbsp;", ' ',$word_list);
+			$word_list = str_replace("/",' ',$word_list);
+			$word_list = str_replace("-",' ',$word_list);
+			$word_list = str_replace("@",' ',$word_list);
+			$word_list = str_replace("|",' ',$word_list);
+			$word_list = str_replace("&",' ',$word_list);
+			$word_list = str_replace("*",' ',$word_list);
+			$word_list = str_replace("+",' ',$word_list);
+			$word_list = str_replace("#",' ',$word_list);
+			$word_list = str_replace("?",' ',$word_list);
+			$word_list = str_replace("…",'',$word_list);
+			$word_list = str_replace(";",' ',$word_list);
+			$word_list = str_replace("'s",'',$word_list);
+			$word_list = str_replace("’s",'',$word_list);
+			$word_list = str_replace("’","'",$word_list);
+			$word_list = str_replace("`","'",$word_list);
+			$word_list = str_replace("s'",'s',$word_list);
+			$word_list = str_replace(".",' ',$word_list);
+			$word_list = str_replace("<",' ',$word_list);
+			$word_list = str_replace(">",' ',$word_list);
+			$words = explode(' ', $word_list);
+		
+			foreach($words as $word) {
+				$total_words++;
+				$word = str_replace(' ', '', $word);
+				$word = str_replace('=', '', $word);
+				$word = str_replace(',', '', $word);
+				$word = trim($word, "?!.,'()`”:“@$#-%\=/");
+				$word = trim($word, '"');
+				$word = trim($word);
+				$word = preg_replace("/[0-9]/", "", $word);
+				if (!check_word($word)) {
+					$dict_word = str_replace("'", "\'", $word);
+					$dict_check = $wpdb->get_results("SELECT word FROM " . $dict_table . " WHERE word='".$dict_word."';");
+					$caps_check = $wpdb->get_results("SELECT option_name, option_value FROM " . $options_table . " WHERE option_name='ignore_caps';");
+
+					if (sizeof($dict_check) < 1) {
+						$word_count++;
+					}
+				}	
+			}
+		}
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='pro_word_count';");
+		$word_count = $word_count + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $word_count), array('option_name' => 'pro_word_count'));
+		$counter = $wpdb->get_results("SELECT option_value FROM $options_table WHERE option_name ='total_word_count';");
+		$total_words = $total_words + intval($counter[0]->option_value);
+		$wpdb->update($options_table, array('option_value' => $total_words), array('option_name' => 'total_word_count'));
+	}
 ?>

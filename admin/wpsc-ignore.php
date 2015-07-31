@@ -177,6 +177,7 @@ function ignore_render() {
 	
 
 	?>
+		<?php check_install_notice(); ?>
 		<div class="wrap">
 			<h2><img src="<?php echo plugin_dir_url( __FILE__ ) . 'images/logo.png'; ?>" alt="WP Spell Check" /> <span style="position: relative; top: -15px;">Ignore List</span></h2>
 			<?php if($message != '') echo "<span class='wpsc-message' style='font-size: 1.3em; color: rgb(0, 115, 0); font-weight: bold; float: left; width: 100%;'>" . $message . "</span>"; ?>
@@ -198,6 +199,52 @@ function ignore_render() {
   fjs.parentNode.insertBefore(js, fjs);
 }(document, 'script', 'facebook-jssdk'));</script>
 				<a href="https://www.wpspellcheck.com/" target="_blank"><img src="<?php echo plugin_dir_url( __FILE__ ) . 'images/logo.png'; ?>" alt="WP Spell Check" /></a>
+<script type="text/javascript">
+//<![CDATA[
+if (typeof newsletter_check !== "function") {
+window.newsletter_check = function (f) {
+    var re = /^([a-zA-Z0-9_\.\-\+])+\@(([a-zA-Z0-9\-]{1,})+\.)+([a-zA-Z0-9]{2,})+$/;
+    if (!re.test(f.elements["ne"].value)) {
+        alert("The email is not correct");
+        return false;
+    }
+    for (var i=1; i<20; i++) {
+    if (f.elements["np" + i] && f.elements["np" + i].value == "") {
+        alert("");
+        return false;
+    }
+    }
+    if (f.elements["ny"] && !f.elements["ny"].checked) {
+        alert("You must accept the privacy statement");
+        return false;
+    }
+    return true;
+}
+}
+//]]>
+</script>
+
+<div class="newsletter newsletter-subscription">
+<h2>Stay up to date with news and software updates</h2>
+<form method="post" action="https://www.wpspellcheck.com/wp-content/plugins/newsletter/do/subscribe.php" onsubmit="return newsletter_check(this)">
+
+<table cellspacing="0" cellpadding="3" border="0">
+
+<!-- email -->
+<tr>
+	<th>Email</th>
+	<td align="left"><input class="newsletter-email" type="email" name="ne" size="30" required></td>
+</tr>
+
+<tr>
+	<td colspan="2" class="newsletter-td-submit">
+		<input class="newsletter-submit" type="submit" value="Sign me up"/>
+	</td>
+</tr>
+
+</table>
+</form>
+</div>
 				<h2>Follow us on Facebook</h2>
 				<div class="fb-like-box" data-href="https://www.facebook.com/pages/WP-Spell-Check/981317565238438" data-colorscheme="light" data-show-faces="false" data-header="true" data-stream="false" data-show-border="true"></div>
 				<div class="wpsc-sidebar" style="margin-bottom: 15px;"><h2>Like the Plugin? Leave us a review</h2><center><a class="review-button" href="https://www.facebook.com/pages/WP-Spell-Check/981317565238438" target="_blank">Leave a Quick Review</a></center><small>Reviews help constantly improve the plugin &amp; keep us motivated! <strong>Thank you for your support!</strong></small></div>

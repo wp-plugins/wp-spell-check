@@ -8,7 +8,6 @@ Custom Dictionary for unusual words: yes
 Scans Password Protected membership Sites: yes
 Unlimited scans on my website: Yes
 
-Scans Categories: Yes WP Spell Check Pro
 Scans SEO Titles: Yes WP Spell Check Pro
 Scans SEO Descriptions: Yes WP Spell Check Pro
 Scans WordPress Menus: Yes WP Spell Check Pro
@@ -17,6 +16,9 @@ Scans Post Titles: Yes WP Spell Check Pro
 Scans Page slugs: Yes WP Spell Check Pro
 Scans Post Slugs: Yes WP Spell Check Pro
 Scans Post categories: Yes WP Spell Check Pro
+Scans Categories: Yes WP Spell Check Pro
+Scans Slider Text: Yes WP Spell Check Pro
+Scans Media File names: Yes WP Spell Check Pro
 
 Copyright: © 2015 Persyo Inc
 Contributors: wpspellcheck
@@ -32,8 +34,8 @@ Pro Add-on / Home Page: https://www.wpspellcheck.com/
 Pro Add-on / Prices: https://www.wpspellcheck.com/purchase-options/
 
 Requires at least: 4.1.1
-Tested up to: 4.2.2
-Stable tag: 1.3
+Tested up to: 4.2.3
+Stable tag: 1.4
 
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -64,6 +66,10 @@ Manual/FTP Install
 
 == Frequently Asked Questions ==
 
+= Does the FREE plugin check everything on my website? =
+
+The FREE plugin only checks contents of pages and posts on your website. For a more extensive check on everything on your website, you can purchase our premium version www.wpspellcheck.com. The premium version checks your entire website
+
 = Reasons to upgrade to "WP Spell Check Pro" =
 Save time, and embarrassment and get the benefits listed on this page https://www.wpspellcheck.com/purchase-options/ 
 
@@ -80,10 +86,6 @@ Right now the plugin supports three languages including: American, Canadian and 
 
 As of now it supports 3 versions of English for Canadian, American and British English. You can choose your language on the menu option
 
-
-= Does the FREE plugin check everything on my website? =
-
-The FREE plugin only checks contents of pages and posts on your website. For a more extensive check on everything on your website, you can purchase our premium version www.wpspellcheck.com. The premium version checks your entire website
 
 = What are the benefits of getting WP Spell Check Pro? =
 
@@ -113,7 +115,7 @@ You can Add, Edit or delete words from My Dictionary.
 
 The basic version of WP Spell Check has some social media and common internet names added to My Dictionary.  We will continue to build the My Dictionary list for your your convenience.
 
-= I see some words already on My Dictionary… =
+= I see some words already on My Dictionary, why? =
 
 For your convenience, we have added some common internet and Social Media names that are not included on dictionary. You can edit or delete these words as needed.
 
@@ -155,6 +157,17 @@ Links that will be updated include menus which are managed via the WordPress adm
 
 We do Not offer support for installation of the product on your website. With the purchase of the plugin, you will receive one year of updates to the plugin. We will be releasing updates on monthly bases with added features and improvements.
 
+= Why does my API Key not work? =
+
+There are a variety of reasons that an API key might not work. To fix this, you can try:
+
+1. Ensure that the API Key has been entered correctly
+2. Ensure that the Website's URL has been entered correctly
+3. Ensure that WP Spell Check Pro or Enterprise versions are installed and activated in your WordPress plugin directory page
+4. Log into your profile page and check that your account has not expired.
+
+If the problem persists, please contact us.
+
 = I have more questions, where should I go? =
 We more questions answered on our website. Feel free to visit www.wpspellcheck.com
 
@@ -167,6 +180,13 @@ We more questions answered on our website. Feel free to visit www.wpspellcheck.c
 4. The WP Spell Check My Dictionary Page
 
 == Changelog ==
+
+= 1.4 =
+- Updated the numbers for errors found on other parts of your website to include the errors for sliders and media files 
+- Updated URL and Email ignore settings to better detect email and URL addresses
+- Updated the code to show more accurate numbers for errors found on the website.
+- Added support for dynamic loading of the pspell extension if PHP does not load it automatically. If your server does not support dynamic loading and you are unable to run the pspell extension, please contact your hosting company. 
+- If you see any issues with the plugin, please submit a feature request at the bottom of any WP Spell Check page and we will address it as soon as possible.
 
 = 1.3 =
 - Fixed an issue where the dictionary files could not be found

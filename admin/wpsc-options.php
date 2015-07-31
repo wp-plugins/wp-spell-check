@@ -52,6 +52,14 @@
 			$wpdb->update($table_name, array('option_value' => 'true'), array('option_name' => 'check_posts'));
 		else
 			$wpdb->update($table_name, array('option_value' => 'false'), array('option_name' => 'check_posts'));
+		if ($_POST['check-sliders'] == 'check-sliders')
+			$wpdb->update($table_name, array('option_value' => 'true'), array('option_name' => 'check_sliders'));
+		else
+			$wpdb->update($table_name, array('option_value' => 'false'), array('option_name' => 'check_sliders'));
+		if ($_POST['check-media'] == 'check-media')
+			$wpdb->update($table_name, array('option_value' => 'true'), array('option_name' => 'check_media'));
+		else
+			$wpdb->update($table_name, array('option_value' => 'false'), array('option_name' => 'check_media'));;
 		if ($_POST['check-menu'] == 'check-menu')
 			$wpdb->update($table_name, array('option_value' => 'true'), array('option_name' => 'check_menus'));
 		else
@@ -96,6 +104,7 @@
 			$wpdb->update($table_name, array('option_value' => 'true'), array('option_name' => 'ignore_websites'));
 		else
 			$wpdb->update($table_name, array('option_value' => 'false'), array('option_name' => 'ignore_websites'));
+
 		if (is_numeric($_POST['scan_frequency'])) {
 			$wpdb->update($table_name, array('option_value' => $_POST['scan_frequency']), array('option_name' => 'scan_frequency'));
 
@@ -167,6 +176,8 @@
 	$api_key = $settings[20]->option_value;
 	$ignore_emails = $settings[23]->option_value;
 	$ignore_websites = $settings[24]->option_value;
+	$check_sliders = $settings[30]->option_value;
+	$check_media = $settings[31]->option_value;
 	//Grab the ignore words data
 	$word_data = $wpdb->get_results("SELECT keyword FROM " . $ignore_table . " WHERE type='word';");
 	$word_list = '';
@@ -184,10 +195,11 @@
 		$message = send_test_email();
 	?>
 		<style> p.submit { display: inline-block; margin-left: 10px; } </style>
+		<?php check_install_notice(); ?>
 		<div class="wrap">
 			<h2><img src="<?php echo plugin_dir_url( __FILE__ ) . 'images/logo.png'; ?>" alt="WP Spell Check" /> <span style="position: relative; top: -15px;">Options</span></h2>
-			<?php if(!$key_valid && $api_key != '') echo "<div class='error' style='color: red; font-weight: bold; font-size: 1.3em'>API Key not valid</div>"; ?>
-			<?php if ($key_valid) echo "<div class='updated' style='color: rgb(0, 115, 0); font-weight: bold; font-size: 1.3em'>API Key is valid</div>"; ?>
+			<?php if(!$key_valid && $api_key != '') echo "<div class='error' style='color: red; font-weight: bold; font-size: 14px'>API Key not valid</div>"; ?>
+			<?php if ($key_valid) echo "<div class='updated' style='color: rgb(0, 115, 0); font-weight: bold; font-size: 14px'>API Key is valid</div>"; ?>
 			<?php if($message != '') echo "<span class='wpsc-message'>" . $message . "</span>"; ?>
 			<form action="admin.php?page=wp-spellcheck-options.php" method="post" name="options">
 			<table class="form-table" style="width: 75%; float: left;" cellpadding="10"><tbody>
@@ -205,7 +217,7 @@
 				<tr><td scope="row" align="left"><label>Language</label></td><td colspan="2"><select name="language_setting">
 <option value="en_CA" <?php if ($language_setting == 'en_CA') echo "selected='selected'"; ?>>English(Canada)</option>
 <option value="en_US" <?php if ($language_setting == 'en_US') echo "selected='selected'"; ?>>English(US)</option>
-<option value="en_GB" <?php if ($language_setting == 'en_UK') echo "selected='selected'"; ?>>English(UK)</option>
+<option value="en_UK" <?php if ($language_setting == 'en_UK') echo "selected='selected'"; ?>>English(UK)</option>
 </select></td></tr>
 				<tr><td scope="row" align="left"><label>Words to ignore (Place one on each line)</label></td><td colspan="2"><textarea name="words-ignore" rows="4" cols="50"><?php echo $word_list; ?></textarea></td></tr>
 				<tr><td scope="row" align="left"><label>Pages/Posts to ignore (Please enter Page/Post titles and place one on each line)</label></td><td colspan="2"><textarea name="pages-ignore" rows="4" cols="50"><?php echo $page_list; ?></textarea></td></tr>
@@ -223,7 +235,9 @@
 				<td  colspan="2" scope="row" align="left"><input type="checkbox" name="seo-desc" value="seo-desc" <?php if ($seo_desc == 'true') echo 'checked'; ?>>Check SEO Descriptions</td></tr>
 				<tr><td scope="row" align="left"><input type="checkbox" name="seo-titles" value="seo-titles" <?php if ($seo_titles == 'true') echo 'checked'; ?>>Check SEO Titles</td>
 				<td colspan="2" scope="row" align="left"><input type="checkbox" name="page-slugs" value="page-slugs" <?php if ($page_slugs == 'true') echo 'checked'; ?>>Check Page Slugs</td></tr>
-				<tr><td scope="row" align="left"><input type="checkbox" name="post-slugs" value="post-slugs" <?php if ($post_slugs == 'true') echo 'checked'; ?>>Check Post Slugs</td></tr>
+				<tr><td scope="row" align="left"><input type="checkbox" name="post-slugs" value="post-slugs" <?php if ($post_slugs == 'true') echo 'checked'; ?>>Check Post Slugs</td>
+				<td scope="row" align="left"><input type="checkbox" name="check-sliders" value="check-sliders" <?php if ($check_sliders == 'true') echo 'checked'; ?>>Check Sliders</td></tr>
+				<tr><td scope="row" align="left"><input type="checkbox" name="check-media" value="check-media" <?php if ($check_media == 'true') echo 'checked'; ?>>Check Media Files</td></tr>
 				<?php } else { ?>
 				<tr><td scope="row" align="left"><input type="checkbox" name="check-pages" value="check-pages" <?php if ($check_pages == 'true') echo 'checked'; ?>>Check Pages</td>
 				<td colspan="2" scope="row" align="left"><input type="checkbox" name="check-posts" value="check-posts" <?php if ($check_posts == 'true') echo 'checked'; ?>>Check Posts</td></tr>
@@ -231,7 +245,7 @@
 				<td scope="row" align="left"><input type="checkbox" name="ignore-emails" value="ignore-emails" <?php if ($ignore_emails == 'true') echo 'checked'; ?>>Ignore Email Addresses</td>
 				<td scope="row" align="left"><input type="checkbox" name="ignore-websites" value="ignore-websites" <?php if ($ignore_websites == 'true') echo 'checked'; ?>>Ignore Website URLs</td></tr>
 				<?php } ?>
-				<tr><td colspan="3" scope="row" align="left"><span style="font-size: 1.3em; font-weight: bold; color: red;">Warning: When updating page/post slugs, some links contained within the theme may not be updated. Consult your webmaster before updating page/post slugs.<br /><a href="https://www.wpspellcheck.com/about/faqs#update-slugs" target="_blank">Click here to learn more</a></td></tr>
+				<tr><td colspan="3" scope="row" align="left"><span style="font-size: 14px; font-weight: bold; color: red;">Warning: When updating <span style="color: black; text-decoration: underline;">page/post slugs</span>, some links contained within the theme may not be updated. Consult your webmaster before updating page/post slugs.<br /><a href="https://www.wpspellcheck.com/about/faqs#update-slugs" target="_blank">Click here to learn more</a></span><br /><br /><span style="font-size: 14px; font-weight: bold; color: red;">When updating <span style="color: black; text-decoration: underline;">Media filenames</span> this may cause images to stop working on your website. This does not apply to descriptions, alternate text, or captions.</span></td></tr>
 				<tr colspan="2"><td><input type="submit" name="submit" value="Update" /></td></tr>
 			</tbody></table>
 		</form>
@@ -245,6 +259,52 @@
   fjs.parentNode.insertBefore(js, fjs);
 }(document, 'script', 'facebook-jssdk'));</script>
 				<a href="https://www.wpspellcheck.com/" target="_blank"><img src="<?php echo plugin_dir_url( __FILE__ ) . 'images/logo.png'; ?>" alt="WP Spell Check" /></a>
+<script type="text/javascript">
+//<![CDATA[
+if (typeof newsletter_check !== "function") {
+window.newsletter_check = function (f) {
+    var re = /^([a-zA-Z0-9_\.\-\+])+\@(([a-zA-Z0-9\-]{1,})+\.)+([a-zA-Z0-9]{2,})+$/;
+    if (!re.test(f.elements["ne"].value)) {
+        alert("The email is not correct");
+        return false;
+    }
+    for (var i=1; i<20; i++) {
+    if (f.elements["np" + i] && f.elements["np" + i].value == "") {
+        alert("");
+        return false;
+    }
+    }
+    if (f.elements["ny"] && !f.elements["ny"].checked) {
+        alert("You must accept the privacy statement");
+        return false;
+    }
+    return true;
+}
+}
+//]]>
+</script>
+
+<div class="newsletter newsletter-subscription">
+<h2>Stay up to date with news and software updates</h2>
+<form method="post" action="https://www.wpspellcheck.com/wp-content/plugins/newsletter/do/subscribe.php" onsubmit="return newsletter_check(this)">
+
+<table cellspacing="0" cellpadding="3" border="0">
+
+<!-- email -->
+<tr>
+	<th>Email</th>
+	<td align="left"><input class="newsletter-email" type="email" name="ne" size="30" required></td>
+</tr>
+
+<tr>
+	<td colspan="2" class="newsletter-td-submit">
+		<input class="newsletter-submit" type="submit" value="Sign me up"/>
+	</td>
+</tr>
+
+</table>
+</form>
+</div>
 				<h2>Follow us on Facebook</h2>
 				<div class="fb-like-box" data-href="https://www.facebook.com/pages/WP-Spell-Check/981317565238438" data-colorscheme="light" data-show-faces="false" data-header="true" data-stream="false" data-show-border="true"></div>
 				<div class="wpsc-sidebar" style="margin-bottom: 15px;"><h2>Like the Plugin? Leave us a review</h2><center><a class="review-button" href="https://www.facebook.com/pages/WP-Spell-Check/981317565238438" target="_blank">Leave a Quick Review</a></center><small>Reviews help constantly improve the plugin &amp; keep us motivated! <strong>Thank you for your support!</strong></small></div>
