@@ -7,6 +7,7 @@ Finds place holder text: yes
 Custom Dictionary for unusual words: yes
 Scans Password Protected membership Sites: yes
 Unlimited scans on my website: Yes
+Supports WordPress Multisite: Yes
 
 Scans SEO Titles: Yes WP Spell Check Pro
 Scans SEO Descriptions: Yes WP Spell Check Pro
@@ -19,6 +20,7 @@ Scans Post categories: Yes WP Spell Check Pro
 Scans Categories: Yes WP Spell Check Pro
 Scans Slider Text: Yes WP Spell Check Pro
 Scans Media File names: Yes WP Spell Check Pro
+
 
 Copyright: © 2015 Persyo Inc
 Contributors: wpspellcheck
@@ -34,8 +36,8 @@ Pro Add-on / Home Page: https://www.wpspellcheck.com/
 Pro Add-on / Prices: https://www.wpspellcheck.com/purchase-options/
 
 Requires at least: 4.1.1
-Tested up to: 4.2.3
-Stable tag: 1.4
+Tested up to: 4.2.4
+Stable tag: 2.0
 
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -168,6 +170,13 @@ There are a variety of reasons that an API key might not work. To fix this, you 
 
 If the problem persists, please contact us.
 
+= Does WP Spell Check Support WordPress Multisite? =
+WP Spell Check supports WordPress Multisites. You can install it through the Network Admin Dashboard, and it will set up for every site on the network.
+
+= What does the Clean up Database and Deactivate button do? =
+
+The "Clean up Database and Deactivate button" will go through and remove all database entries that WP Spell Check has created and then deactivate itself. If you wish to continue using WP Spell Check after, you can reactivate it on the WordPress plugins page and it will do the necessary database setup.
+
 = I have more questions, where should I go? =
 We more questions answered on our website. Feel free to visit www.wpspellcheck.com
 
@@ -180,6 +189,10 @@ We more questions answered on our website. Feel free to visit www.wpspellcheck.c
 4. The WP Spell Check My Dictionary Page
 
 == Changelog ==
+
+= 2.0 =
+- Added support for WordPress Multisite
+- Added option to clean up database and deactivate plugin
 
 = 1.4 =
 - Updated the numbers for errors found on other parts of your website to include the errors for sliders and media files 

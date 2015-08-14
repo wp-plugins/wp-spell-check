@@ -2,11 +2,11 @@
 	/*
 	Plugin Name: WP Spell Check
 	Description: Checks pages and posts for spelling errors
-	Version: 1.4
+	Version: 2.0
 	Author: Persyo Inc.
 	Requires at least: 4.1.1
-	Tested up to: 4.2.3
-	Stable tag: 1.4
+	Tested up to: 4.2.4
+	Stable tag: 2.0
 	License: GPLv2 or later
 	License URI: http://www.gnu.org/licenses/gpl-2.0.html
 	Copyright: © 2015 Persyo Inc
@@ -229,8 +229,28 @@
 		
 		add_option( 'scdb_version', $scdb_version );
 	}
+
 	
-	register_activation_hook( __FILE__, 'install_spellcheck' );
+	function install_spellcheck_main($networkwide) {
+		global $wpdb;
+		
+		if (function_exists('is_multisite') && is_multisite()) {
+			if ($networkwide) {
+				$old_blog = $wpdb->blogid;
+				
+				//Get all blog IDs
+				$blogids = $wpdb->get_col("SELECT blog_ID FROM $wpdb->blogs");
+				foreach ($blogids as $blog_id) {
+					switch_to_blog($blog_id);
+					install_spellcheck();
+				}
+				switch_to_blog($old_blog);
+			}
+		}
+		install_spellcheck();
+	}
+	
+	register_activation_hook( __FILE__, 'install_spellcheck_main' );
 
 	function update_db_check() {
 		global $wpdb;
@@ -245,10 +265,92 @@
 			$wpdb->insert($options_table, array('option_name' => 'media_count', 'option_value' => '0'));
 		}
 	}
-	add_action( 'plugins_loaded', 'update_db_check' );
+	
+	function update_db_check_main() {
+		global $wpdb;
+		
+		if (function_exists('is_multisite') && is_multisite()) {
+			if ($networkwide) {
+				$old_blog = $wpdb->blogid;
+				
+				//Get all blog IDs
+				$blogids = $wpdb->get_col("SELECT blog_ID FROM $wpdb->blogs");
+				foreach ($blogids as $blog_id) {
+					switch_to_blog($blog_id);
+					update_db_check();
+				}
+				switch_to_blog($old_blog);
+			}
+		}
+		update_db_check();
+	}
+	add_action( 'plugins_loaded', 'update_db_check_main' );
+	
+	/* Clear out the database for uninstallation */
+	function prepare_uninstall() {
+		global $wpdb;
+		
+		//Clean up the database
+		$sql = "DROP TABLE " . $wpdb->prefix . "spellcheck_dictionary;";
+		$wpdb->query($sql);
+		$sql = "DROP TABLE " . $wpdb->prefix . "spellcheck_ignore;";
+		$wpdb->query($sql);
+		$sql = "DROP TABLE " . $wpdb->prefix . "spellcheck_options;";
+		$wpdb->query($sql);
+		$sql = "DROP TABLE " . $wpdb->prefix . "spellcheck_words;";
+		$wpdb->query($sql);
+		
+		//Clean up the user meta table
+		global $current_user;
+		$user_id = $current_user->ID;
+		delete_user_meta($user_id, 'wpsc_notice_date');
+		delete_user_meta($user_id, 'wpsc_times_dismissed');
+		delete_user_meta($user_id, 'wpsc_ignore_notice', 'true');
+		delete_user_meta($user_id, 'wpsc_ignore_install_notice');
+		delete_user_meta($user_id, 'wpsc_ignore_pspell_notice');
+	}
+	
+	/*Create Network Page*/
+	function wpsc_uninstall_page() {
+		if ($_POST['uninstall'] == 'Uninstall') {
+			global $wpdb;
+		
+			if (function_exists('is_multisite') && is_multisite()) {
+				if ($networkwide) {
+					$old_blog = $wpdb->blogid;
+				
+					//Get all blog IDs
+					$blogids = $wpdb->get_col("SELECT blog_ID FROM $wpdb->blogs");
+					foreach ($blogids as $blog_id) {
+						switch_to_blog($blog_id);
+						prepare_uninstall();
+					}
+					switch_to_blog($old_blog);
+				}
+			}
+			prepare_uninstall();
+			deactivate_plugins( 'wp-spell-check/wpspellcheck.php' );
+			if ($pro_included) deactivate_plugins( 'wp-spell-check-pro/wpspellcheckpro.php' );
+			if ($ent_included) deactivate_plugins( 'wp-spell-check-enterprise/wpspellcheckenterprise.php' );
+			wp_die( 'WP Spell Check has been uninstalled. If you wish to use the plugin again you may activate it on the WordPress plugin page' );
+		}
+	
+		?>
+		<h2><img src="<?php echo plugin_dir_url( __FILE__ ) . 'images/logo.png'; ?>" alt="WP Spell Check" /> <span style="position: relative; top: -15px;">Network Uninstall</span></h2>
+		<p>This will deactivate WP Spell Check on all sites on the network and clean up the database of any changes made by WP Spell Check. If you wish to use WP Spell Check again after, you may activate it on the WordPress plugins page</p>
+		<form action="settings.php?page=wpsc_uninstall_page" method="post" name="uninstall">
+			<input type="submit" name="uninstall" value="Clean up Database and Deactivate Plugin" />
+		</form>
+		<?php
+	}
 	
 
 	/* Menu Functions */
+	function add_network_menu() {
+		add_submenu_page('settings.php', 'WP Spell Check Database Cleanup and Deactivation', 'WP Spell Check Database Cleanup and Deactivation', 'manage_options', 'wpsc_uninstall_page', 'wpsc_uninstall_page');
+	}
+	add_action( 'network_admin_menu', 'add_network_menu' );
+	
 	function add_menu() {	
 		add_menu_page( 'WP Spell Checker', 'WP Spell Check', 'manage_options', 'wp-spellcheck.php', 'admin_render', plugin_dir_url( __FILE__ ) . 'images/logo-icon-16x16.png');
 		add_submenu_page( 'wp-spellcheck.php', 'WP Scanner', 'WP Scanner', 'manage_options', 'wp-spellcheck.php', 'admin_render');
@@ -484,52 +586,12 @@ window.newsletter_check = function (f) {
 <div class="wpsc-install-dismiss"><a href="?wpsc_ignore_install_notice=1&page=<?php echo $page; ?>"><button style="padding: 1px 5px; font-weight: bold; margin: 5px 0px; border: 1px solid #008200;">X</button></a></div>
 			<img src="/wp-content/plugins/wp-spell-check/admin/../images/logo.png" alt="WP Spell Check">
   		<div class="wpsc-install-content">
-<!--[CDATA[
-if (typeof newsletter_check !== "function") {
-window.newsletter_check = function (f) {
-    var re = /^([a-zA-Z0-9_\.\-\+])+\@(([a-zA-Z0-9\-]{1,})+\.)+([a-zA-Z0-9]{2,})+$/;
-    if (!re.test(f.elements["ne"].value)) {
-        alert("The email is not correct");
-      return false;
-    }
-    for (var i=1; i<20; i++) {
-    if (f.elements["np" + i] && f.elements["np" + i].value == "") {
-        alert("");
-        return false;
-    }
-    }
-    if (f.elements["ny"] && !f.elements["ny"].checked) {
-        alert("You must accept the privacy statement");
-        return false;
-    }
-    return true;
-}
-}
-//]]-->
-
-
 <div class="newsletter newsletter-subscription">
 <h2 style="color: #008200;">Stay up to date with news and software updates</h2>
-<form method="post" action="https://www.wpspellcheck.com/wp-content/plugins/newsletter/do/subscribe.php" onsubmit="return newsletter_check(this)">
-
-<table cellspacing="0" cellpadding="3" border="0">
-
-<!-- email -->
-<tbody><tr>
-	<th>Email</th>
-	<td align="left"><input class="newsletter-email" style="width: 85%;" type="email" name="ne" size="30" required=""></td>
-</tr>
-
-<tr>
-	<td colspan="2" class="newsletter-td-submit">
-		<input class="newsletter-submit" type="submit" value="Sign me up">
-	</td>
-</tr>
-
-</tbody></table>
-</form>
+<button class="newsletter-submit" type="submit">Download Now</button>
 </div>
 </div>
+<div class="wpsc-install-content"><iframe width="290" height="163" src="https://www.youtube.com/embed/NWkqkdkvwwE" frameborder="0" allowfullscreen></iframe></div>
 </div>
 	<?php }
 
@@ -548,6 +610,7 @@ window.newsletter_check = function (f) {
 	function wpsc_ignore_install_notice() {
 		global $current_user;
 		$user_id = $current_user->ID;
+
 		if ( isset($_GET['wpsc_ignore_install_notice']) && $_GET['wpsc_ignore_install_notice'] == '1') {
 			$dismissed = get_user_meta($user_id, 'wpsc_ignore_install_notice', true);
 			if ($dismissed == '') {

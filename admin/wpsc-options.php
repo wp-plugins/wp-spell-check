@@ -31,6 +31,14 @@
 	$table_name = $wpdb->prefix . 'spellcheck_options';
 	$ignore_table = $wpdb->prefix . 'spellcheck_ignore';
 	$message = '';
+	if ($_POST['uninstall'] == 'Clean up Database and Deactivate Plugin') {
+		prepare_uninstall();
+		deactivate_plugins( 'wp-spell-check/wpspellcheck.php' );
+		if ($pro_included) deactivate_plugins( 'wp-spell-check-pro/wpspellcheckpro.php' );
+		if ($ent_included) deactivate_plugins( 'wp-spell-check-enterprise/wpspellcheckenterprise.php' );
+		wp_die( 'WP Spell Check has been uninstalled. If you wish to use the plugin again you may activate it on the WordPress plugin page' );
+	}
+	
 	if ($_POST['submit'] == 'Update' || $_POST['submit'] == 'Send Test Email') {
 		//Check to see if update button was clicked and update all options
 		$message = "<h3 style='color: rgb(0, 115, 0);'>Options Updated</h3>";
@@ -245,6 +253,7 @@
 				<td scope="row" align="left"><input type="checkbox" name="ignore-emails" value="ignore-emails" <?php if ($ignore_emails == 'true') echo 'checked'; ?>>Ignore Email Addresses</td>
 				<td scope="row" align="left"><input type="checkbox" name="ignore-websites" value="ignore-websites" <?php if ($ignore_websites == 'true') echo 'checked'; ?>>Ignore Website URLs</td></tr>
 				<?php } ?>
+				<tr><td colspan="3" scope="row" align="left"><input type="submit" name="uninstall" value="Clean up Database and Deactivate Plugin" /><span style="margin-left: 10px;">This will deactivate WP Spell Check on all sites on the network and clean up the database of any changes made by WP Spell Check. If you wish to use WP Spell Check again after, you may activate it on the WordPress plugins page</span></td></tr>
 				<tr><td colspan="3" scope="row" align="left"><span style="font-size: 14px; font-weight: bold; color: red;">Warning: When updating <span style="color: black; text-decoration: underline;">page/post slugs</span>, some links contained within the theme may not be updated. Consult your webmaster before updating page/post slugs.<br /><a href="https://www.wpspellcheck.com/about/faqs#update-slugs" target="_blank">Click here to learn more</a></span><br /><br /><span style="font-size: 14px; font-weight: bold; color: red;">When updating <span style="color: black; text-decoration: underline;">Media filenames</span> this may cause images to stop working on your website. This does not apply to descriptions, alternate text, or captions.</span></td></tr>
 				<tr colspan="2"><td><input type="submit" name="submit" value="Update" /></td></tr>
 			</tbody></table>
